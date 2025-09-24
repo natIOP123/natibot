@@ -2130,5 +2130,6 @@ def main():
     except Exception as e:
         logger.error(f"Error starting bot: {e}")
 
+
 if __name__ == '__main__':
     main()
