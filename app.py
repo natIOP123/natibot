@@ -386,7 +386,7 @@ async def register_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "እባክዎ ስልክ ቁጥርዎን ያካፍሉ።",
             reply_markup=ReplyKeyboardMarkup(
-                [[{"text": "📱 እውቂያ አጋራ", "request_contact": True}, '⬅️ ተመለስ']],
+                [[{"text": "📱 ስልክ ቁጥር አጋራ", "request_contact": True}, '⬅️ ተመለስ']],
                 resize_keyboard=True,
                 one_time_keyboard=True
             )
@@ -579,7 +579,7 @@ async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardMarkup(
             [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
              ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
-             ['እሑድ', 'ጨርሻል', '⬅️ ተመለስ']],
+             ['እሑድ', 'ጨርስ', '⬅️ ተመለስ']],
             resize_keyboard=True
         )
     )
@@ -603,7 +603,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         )
         return CHOOSE_PLAN
-    elif choice == 'ጨርሻል':
+    elif choice == 'ጨርስ':
         selected_dates = context.user_data.get('selected_dates', [])
         if not selected_dates:
             await update.message.reply_text(
@@ -611,7 +611,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=ReplyKeyboardMarkup(
                     [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
                      ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
-                     ['እሑድ', 'ጨርሻል', '⬅️ ተመለስ']],
+                     ['እሑድ', 'ጨርስ', '⬅️ ተመለስ']],
                     resize_keyboard=True
                 )
             )
@@ -662,7 +662,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=ReplyKeyboardMarkup(
                     [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
                      ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
-                     ['እሑድ', 'ጨርሻል', '⬅️ ተመለስ']],
+                     ['እሑድ', 'ጨርስ', '⬅️ ተመለስ']],
                     resize_keyboard=True
                 )
             )
@@ -674,26 +674,36 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 conn.close()
     elif choice in valid_days:
         selected_dates = context.user_data.get('selected_dates', [])
-        if choice not in selected_dates:
-            selected_dates.append(choice)
-            context.user_data['selected_dates'] = selected_dates
+        if choice in selected_dates:
+            await update.message.reply_text(
+                f"❌ {choice} ቀድሞውኑ ታክሏል። እባክዎ ሌላ ቀን ይምረጡ ወይም 'ጨርስ' ይጫኑ።",
+                reply_markup=ReplyKeyboardMarkup(
+                    [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
+                     ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
+                     ['እሑድ', 'ጨርስ', '⬅️ ተመለስ']],
+                    resize_keyboard=True
+                )
+            )
+            return CHOOSE_DATE
+        selected_dates.append(choice)
+        context.user_data['selected_dates'] = selected_dates
         await update.message.reply_text(
-            f"✅ {choice} ታክሏል። ተጨማሪ ቀናት ይምረጡ ወይም 'ጨርሻል' ይጫኑ።",
+            f"✅ {choice} ታክሏል። ተጨማሪ ቀናት ይምረጡ ወይም 'ጨርስ' ይጫኑ።",
             reply_markup=ReplyKeyboardMarkup(
                 [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
                  ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
-                 ['እሑድ', 'ጨርሻል', '⬅️ ተመለስ']],
+                 ['እሑድ', 'ጨርስ', '⬅️ ተመለስ']],
                 resize_keyboard=True
             )
         )
         return CHOOSE_DATE
     else:
         await update.message.reply_text(
-            "❌ የማይሰራ ምርጫ። እባክዎ ቀን ወይም 'ጨርሻል' ይምረጡ።",
+            "❌ የማይሰራ ምርጫ። እባክዎ ቀን ወይም 'ጨርስ' ይምረጡ።",
             reply_markup=ReplyKeyboardMarkup(
                 [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
                  ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
-                 ['እሑድ', 'ጨርሻል', '⬅️ ተመለስ']],
+                 ['እሑድ', 'ጨርስ', '⬅️ ተመለስ']],
                 resize_keyboard=True
             )
         )
@@ -892,7 +902,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
         if not context.user_data['selected_meals'][selected_dates[current_day_index]]:
             await update.message.reply_text(
                 "❌ ቢያንስ አንድ ምግብ ይምረጡ ለዚህ ቀን።",
-                reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርሻል', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
+                reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
             )
             return MEAL_SELECTION
         context.user_data['current_day_index'] = current_day_index + 1
@@ -918,11 +928,11 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             f"📝 ለ{current_day} የምግብ ቁጥር ያስገቡ (ለምሳሌ፣ '1' ወይም 'ሼፍ' ለሼፍ ውሳኔ)።\n"
             "ለመሰረዝ 'ሰርዝ' ይፃፉ።\n"
             "ተጨማሪ ምግብ ይጨምሩ ወይም 'ቀጣይ ቀን' ይጫኑ።",
-            reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርሻል', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
+            reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
         )
         return MEAL_SELECTION
     # Handle finish
-    if text == 'ጨርሻል':
+    if text == 'ጨርስ':
         return await confirm_meal_selection(update, context)
     # Validate current day
     try:
@@ -959,7 +969,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
         else:
             await update.message.reply_text(
                 f"❌ ለ{current_day} በ{category} ምድብ ምግብ የለም። እባክዎ በእጅ ይምረጡ።",
-                reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርሻል', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
+                reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
             )
             return MEAL_SELECTION
     else:
@@ -981,19 +991,19 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             else:
                 await update.message.reply_text(
                     f"❌ የማይሰራ የምግብ ቁጥር {text}። 1 እስከ {len(menu_items)} መካከል ይምረጡ።",
-                    reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርሻል', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
                 )
                 return MEAL_SELECTION
         except ValueError:
             await update.message.reply_text(
                 f"❌ የማይሰራ ግብዓት '{text}'። ንጥል ያስገቡ (ለምሳሌ '1') ወይም 'ሼፍ'።",
-                reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርሻል', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
+                reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
             )
             return MEAL_SELECTION
     # Ask for more or next
     await update.message.reply_text(
-        f"ለ{current_day} ተጨማሪ ምግብ ይጨምሩ? ወይም 'ቀጣይ ቀን' ወይም 'ጨርሻል' ይጫኑ።",
-        reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርሻል', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
+        f"ለ{current_day} ተጨማሪ ምግብ ይጨምሩ? ወይም 'ቀጣይ ቀን' ወይም 'ጨርስ' ይጫኑ።",
+        reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
     )
     return MEAL_SELECTION
 
@@ -1063,7 +1073,7 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "12. የፍስክ በሼፍ ውሳኔ …….. 260ብር\n"
             f"ለ{selected_dates[0]} የምግብ ቁጥር ያስገቡ (ለምሳሌ '1') ወይም 'ሼፍ'።\n"
             "ለመሰረዝ 'ሰርዝ' ይፃፉ።",
-            reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርሻል', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
+            reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['⬅️ ተመለስ']], resize_keyboard=True)
         )
         return MEAL_SELECTION
     if user_input != '✅ የምግብ ዝርዝሩ ትክክል ነው':
@@ -1463,7 +1473,7 @@ async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "እባክዎ ስልክ ቁጥርዎን ያካፍሉ።",
         reply_markup=ReplyKeyboardMarkup(
-            [[{"text": "📱 እውቂያ አጋራ", "request_contact": True}, "ሰርዝ", '⬅️ ተመለስ']],
+            [[{"text": "📱 ስልክ ቁጥር አጋራ", "request_contact": True}, "ሰርዝ", '⬅️ ተመለስ']],
             resize_keyboard=True,
             one_time_keyboard=True
         )
