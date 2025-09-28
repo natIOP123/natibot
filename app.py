@@ -246,8 +246,8 @@ def build_delete_menu_text(menu_items, week_start):
 def get_main_keyboard(user_id):
     keyboard = [
         ['🍽 ምግብ ዝርዝር', '🛒 ምዝገባ'],
-        ['📋 የእኔ ምዝገባ', '📅 የእኔ ምግቦች'],
-        ['📱 ስልክ ቁጥር', '🍴 ምግብ ምረጥ']  # ✅ Updated from "📞 እውቂያ"
+        ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች'],  # ✅ Updated
+        ['❓ እርዳታ አግኝ', '🍴 ምግብ ምረጥ']   # ✅ Updated
     ]
     if user_id in ADMIN_IDS:
         keyboard.extend([
@@ -335,7 +335,7 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return MAIN_MENU
 
-# Help command (used after payment approval)
+# Help command (used after payment approval and for "እርዳታ አግኝ")
 async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     commands_text = (
@@ -348,9 +348,8 @@ async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📋 የሚገኙ ትዕዛዞች:\n"
         "🍽 /menu - የሳምንቱን ምግብ ዝርዝር ይመልከቱ\n"
         "🛒 /subscribe - የምዝገባ እቅድ ይምረጡ\n"
-        "📋 /my_subscription - የምዝገባ ሁኔታን ይመልከቱ\n"
+        "👤 /my_subscription - የእርስዎ መረጃ ይመልከቱ\n"
         "📅 /my_meals - የመረጧቸውን ምግቦች ይመልከቱ\n"
-        "📱 /contact - ስልክ ቁጥር ያዘምኑ\n"
         "❓ /help - ይህን የእገዛ መልእክት ይመልከቱ\n"
         "🍴 /select_meals - ምግቦችዎን ይምረጡ"
     )
@@ -369,7 +368,7 @@ async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     await update.message.reply_text(commands_text, reply_markup=get_main_keyboard(user.id))
 
-# Registration: Full name ✅ (FIXED: now properly starts here)
+# Registration: Full name
 async def register_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if update.message.text == '🔙 ተመለስ':
@@ -399,12 +398,8 @@ async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         conn.commit()
         await update.message.reply_text(
-            "እባክዎ ስልክ ቁጥርዎን ያካፍሉ።",
-            reply_markup=ReplyKeyboardMarkup(
-                [[{"text": "📱 ስልክ ቁጥር አጋራ", "request_contact": True}, '🔙 ተመለስ']],
-                resize_keyboard=True,
-                one_time_keyboard=True
-            )
+            "እባክዎ ስልክ ቁጥርዎን ያስገቡ (ለምሳሌ: 0912345678)።",
+            reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
         return REGISTER_PHONE
     except Exception as e:
@@ -417,12 +412,19 @@ async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
-# Registration: Phone number
+# Registration: Phone number (manual input only)
 async def register_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if update.message.text == '🔙 ተመለስ':
         return await back_to_main(update, context)
-    phone_number = update.message.contact.phone_number if update.message.contact else update.message.text
+    phone_number = update.message.text.strip()
+    # Basic phone validation (Ethiopian format)
+    if not re.match(r'^09\d{8}$', phone_number):
+        await update.message.reply_text(
+            "❌ የማይሰራ ስልክ ቁጥር። እባክዎ ትክክለኛ የኢትዮጵያ ቁጥር ያስገቡ (ለምሳሌ: 0912345678)።",
+            reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+        )
+        return REGISTER_PHONE
     context.user_data['phone_number'] = phone_number
     conn = None
     cur = None
@@ -1340,12 +1342,11 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             )
             conn.commit()
             await query.message.reply_text("✅ ክፍያ ተቀበለ።")
-            # ✅ Send help text after approval
+            # Send success message and help text
             await context.bot.send_message(
                 chat_id=user_id,
                 text="✅ የእርስዎ ክፍያ ተቀበለ! ምግቦችዎ ተደረጉ።"
             )
-            # Send full command list
             fake_update = Update(0, message=type('obj', (object,), {'effective_user': type('obj', (object,), {'id': user_id})}))
             await send_help_text(fake_update, context)
         elif action == 'reject':
@@ -1377,7 +1378,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         if conn:
             conn.close()
 
-# My Subscription
+# My Subscription → My Info
 async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     conn = None
@@ -1462,17 +1463,10 @@ async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
-# Contact Update
-async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "እባክዎ ስልክ ቁጥርዎን ያካፍሉ።",
-        reply_markup=ReplyKeyboardMarkup(
-            [[{"text": "📱 ስልክ ቁጥር አጋራ", "request_contact": True}, "ሰርዝ", '🔙 ተመለስ']],
-            resize_keyboard=True,
-            one_time_keyboard=True
-        )
-    )
-    return REGISTER_PHONE
+# Help button handler
+async def help_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await send_help_text(update, context)
+    return MAIN_MENU
 
 # Admin: Update Menu
 async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1909,7 +1903,6 @@ def main():
                 CommandHandler('subscribe', choose_plan),
                 CommandHandler('my_subscription', my_subscription),
                 CommandHandler('my_meals', my_meals),
-                CommandHandler('contact', contact),
                 CommandHandler('select_meals', select_meals),
                 CommandHandler('admin_update_menu', admin_update_menu),
                 CommandHandler('admin_delete_menu', admin_delete_menu),
@@ -1926,9 +1919,9 @@ def main():
                 MAIN_MENU: [
                     MessageHandler(filters.Regex('^🍽 ምግብ ዝርዝር$'), show_menu),
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
-                    MessageHandler(filters.Regex('^📋 የእኔ ምዝገባ$'), my_subscription),
+                    MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), my_subscription),  # ✅ Updated
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
-                    MessageHandler(filters.Regex('^📱 ስልክ ቁጥር$'), contact),  # ✅ Updated
+                    MessageHandler(filters.Regex('^❓ እርዳታ አግኝ$'), help_button),  # ✅ Updated
                     MessageHandler(filters.Regex('^🍴 ምግብ ምረጥ$'), select_meals),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር አዘምን$'), admin_update_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር ሰርዝ$'), admin_delete_menu),
@@ -1939,13 +1932,11 @@ def main():
                     MessageHandler(filters.Regex('^🔐 ማስታወቂያ$'), admin_announce),
                     MessageHandler(filters.Regex('^🔐 ቦታ አዘጋጅ$'), set_admin_location),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን ተመልከት$'), view_locations),
-                    MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),  # Starts name input
+                    MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
                 ],
-                REGISTER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name)],  # ✅ Fixed
-                REGISTER_PHONE: [
-                    MessageHandler(filters.CONTACT | (filters.TEXT & ~filters.COMMAND), register_phone)
-                ],
+                REGISTER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name)],
+                REGISTER_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_phone)],  # ✅ Manual only
                 REGISTER_LOCATION: [
                     MessageHandler(filters.LOCATION | (filters.TEXT & ~filters.COMMAND), register_location)
                 ],
