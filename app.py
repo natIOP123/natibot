@@ -10,6 +10,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, ContextTyp
 import math
 import validators
 from time import sleep
+from shapely.geometry import Point, Polygon
 
 # Enable logging
 logging.basicConfig(
@@ -22,7 +23,7 @@ BOT_TOKEN = "7386306627:AAHdCm0OMiitG09dEbD0qmjbNT-pvq0Ny6A"
 DATABASE_URL = "postgresql://postgres.unceacyznxuawksbfctj:Aster#123#@aws-1-eu-north-1.pooler.supabase.com:6543/postgres"
 ADMIN_IDS = [8188464845]
 
-# Admin locations (hardcoded)
+# Admin locations (hardcoded) - treated as polygon vertices (lat, lon)
 ADMIN_LOCATIONS = [
     (9.020238599143552, 38.82560078203035),
     (9.017190196514154, 38.75281767667821),
@@ -31,6 +32,9 @@ ADMIN_LOCATIONS = [
     (8.985448934391043, 38.79958228020363),
     (9.006143350714895, 38.78995524036579)
 ]
+
+# Create the delivery polygon (shapely expects (lon, lat))
+DELIVERY_POLYGON = Polygon([(lon, lat) for lat, lon in ADMIN_LOCATIONS])
 
 # Time zone for East Africa Time (EAT, UTC+3)
 EAT = pytz.timezone('Africa/Nairobi')
@@ -52,19 +56,6 @@ def get_db_connection():
     except Exception as e:
         logger.error(f"Failed to connect to database: {e}")
         raise
-
-# Haversine distance calculation
-def haversine(lat1, lon1, lat2, lon2):
-    R = 6371  # Earth radius in km
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (
-        math.sin(dlat / 2) ** 2 +
-        math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-        math.sin(dlon / 2) ** 2
-    )
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
 
 # Initialize database
 def init_db():
@@ -483,22 +474,21 @@ async def register_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (location, user.id)
         )
         conn.commit()
-        # Check distance if location is coordinates
+        # Check if location is coordinates and inside delivery polygon
         if location and location.startswith('(') and ',' in location:
             try:
                 match = re.match(r'\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)', location)
                 if match:
                     user_lat = float(match.group(1))
                     user_lng = float(match.group(2))
-                    dists = [haversine(user_lat, user_lng, lat, lng) for lat, lng in ADMIN_LOCATIONS]
-                    min_dist = min(dists)
-                    if min_dist > 1:
+                    user_point = Point(user_lng, user_lat)
+                    if not DELIVERY_POLYGON.contains(user_point):
                         await update.message.reply_text(
-                            f"❌ በእርስዎ ቦታ አገልግሎት አንሰጥም (ርቀት: {min_dist:.2f}ኪ.ሜ > 1ኪ.ሜ)። እባክዎ በ1ኪ.ሜ ርቀት ውስጥ ያለ ቦታ ያጋሩ።"
+                            "❌ በእርስዎ ቦታ አገልግሎት አንሰጥም። እባክዎ በማስተናፈሻ አካባቢ ውስጥ ያለ ቦታ ያጋሩ።"
                         )
                         return REGISTER_LOCATION
             except Exception as e:
-                logger.error(f"Error calculating distance for user {user.id}: {e}")
+                logger.error(f"Error checking polygon for user {user.id}: {e}")
                 await update.message.reply_text("❌ ቦታ በማስኬድ ላይ ስህተት። እባክዎ ተገቢ ቦታ ያጋሩ ወይም 'ዝለል' ይፃፉ።")
                 return REGISTER_LOCATION
         # Display entered information
