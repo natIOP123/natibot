@@ -246,20 +246,17 @@ def build_delete_menu_text(menu_items, week_start):
 def get_main_keyboard(user_id):
     keyboard = [
         ['🍽 ምግብ ዝርዝር', '🛒 ምዝገባ'],
-        ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች'],
-        ['❓ እርዳታ አግኝ', '🍴 ምግብ ምረጥ']
+        ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች'],  # ✅ Updated
+        ['❓ እርዳታ አግኝ', '🍴 ምግብ ምረጥ']   # ✅ Updated
     ]
     if user_id in ADMIN_IDS:
-        keyboard = [
-            ['🍽 ምግብ ዝርዝር'],
-            ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች'],
-            ['❓ እርዳታ አግኝ'],
+        keyboard.extend([
             ['🔐 ምግብ ዝርዝር አዘምን', '🔐 ምግብ ዝርዝር ሰርዝ'],
             ['🔐 ተመዝጋቢዎችን ተመልከት', '🔐 ክፍያዎችን ተመልከት'],
             ['🔐 ክፍያዎችን አረጋግጥ', '🔐 የዕለት ትዕዛዞች'],
             ['🔐 ማስታወቂያ', '🔐 ቦታ አዘጋጅ'],
             ['🔐 ቦታዎችን ተመልከት']
-        ]
+        ])
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 # Start command with updated onboarding message
@@ -273,7 +270,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Onboarding message in Amharic
         onboarding_text = (
             "👋 እንኳን ወደ ኦዝ ኪችን የምግብ ምዝገባ በደና መጡ!\n"
-            "ትኩስ እና ጣፋጭ ምግቦችን በነጻ ለእርስዎ እናደርሳለን።\n"
+            "ትኩስ እና ጣፋጭ ምግቦችን በነጻ ለእርስዎ እናደርሳለን።\n\n"
             "የአገልግሎቱ መግለጫዎች እና ሂደቶች:\n"
             "1️⃣ የምዝገባ እቅድዎን እና ቀን ይምረጡ\n"
             "2️⃣ የሚወዷቸውን ምግቦች ከምግብ ዝርዝር ውስጥ ይምረጡ (ወይንም ከፈለጉ በሼፍ ውሳኔ)\n"
@@ -291,10 +288,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return MAIN_MENU
         else:
             # Show only two buttons for new users
-            if user.id in ADMIN_IDS:
-                keyboard = [['🍽 ምግብ ዝርዝር'], ['🔐 ምግብ ዝርዝር አዘምን', '🔐 ምግብ ዝርዝር ሰርዝ'], ['🔐 ተመዝጋቢዎችን ተመልከት']]
-            else:
-                keyboard = [['📋 ይመዝገቡ', '💬 ድጋፍ']]
+            keyboard = [['📋 ይመዝገቡ', '💬 ድጋፍ']]
             await update.message.reply_text(
                 onboarding_text,
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -334,10 +328,7 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return MAIN_MENU
     else:
-        if user.id in ADMIN_IDS:
-            keyboard = [['🍽 ምግብ ዝርዝር'], ['🔐 ምግብ ዝርዝር አዘምን', '🔐 ምግብ ዝርዝር ሰርዝ'], ['🔐 ተመዝጋቢዎችን ተመልከት']]
-        else:
-            keyboard = [['📋 ይመዝገቡ', '💬 ድጋፍ']]
+        keyboard = [['📋 ይመዝገቡ', '💬 ድጋፍ']]
         await update.message.reply_text(
             "🧾 ወደ ዋና ገጽ ተመለስተዋል።",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -353,16 +344,15 @@ async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "የአገልግሎቱ መግለጫዎች እና ሂደቶች?\n"
         "1️⃣ የምዝገባ እቅድዎን እና ቀን ይምረጡ\n"
         "2️⃣ የሚወዷቸውን ምግቦች ከምግብ ዝርዝር ውስጥ ይምረጡ (ወይንም ከፈለጉ በሼፍ ውሳኔ)\n"
-        "3️⃣ በየቀኑ የማስታወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።\n"
+        "3️⃣ በየቀኑ የማስታወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።\n\n"
         "📋 የሚገኙ ትዕዛዞች:\n"
         "🍽 /menu - የሳምንቱን ምግብ ዝርዝር ይመልከቱ\n"
+        "🛒 /subscribe - የምዝገባ እቅድ ይምረጡ\n"
         "👤 /my_subscription - የእርስዎ መረጃ ይመልከቱ\n"
         "📅 /my_meals - የመረጧቸውን ምግቦች ይመልከቱ\n"
         "❓ /help - ይህን የእገዛ መልእክት ይመልከቱ\n"
+        "🍴 /select_meals - ምግቦችዎን ይምረጡ"
     )
-    if user.id not in ADMIN_IDS:
-        commands_text += "🛒 /subscribe - የምዝገባ እቅድ ይምረጡ\n🍴 /select_meals - ምግቦችዎን ይምረጡ\n"
-
     if user.id in ADMIN_IDS:
         commands_text += (
             "\n🔐 የአስተዳዳሪ ትዕዛዞች:\n"
@@ -549,23 +539,16 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return REGISTER_NAME
     elif choice == '✅ መረጃው ትክክል ነው ቀጥል':
-        if user.id in ADMIN_IDS:
-            await update.message.reply_text(
-                "📦 የምዝገባ እቅድ ማስገባት የለበትም።",
-                reply_markup=get_main_keyboard(user.id)
+        await update.message.reply_text(
+            "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
+            "🍽️ የምሳ\n"
+            "🥘 የእራት\n",
+            reply_markup=ReplyKeyboardMarkup(
+                [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                resize_keyboard=True
             )
-            return MAIN_MENU
-        else:
-            await update.message.reply_text(
-                "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
-                "🍽️ የምሳ\n"
-                "🥘 የእራት\n",
-                reply_markup=ReplyKeyboardMarkup(
-                    [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
-                    resize_keyboard=True
-                )
-            )
-            return CHOOSE_PLAN
+        )
+        return CHOOSE_PLAN
     else:
         await update.message.reply_text(
             "❌ እባክዎ '✅ መረጃው ትክክል ነው ቀጥል' ወይም '⛔ አስተካክል' ይምረጡ።",
@@ -582,23 +565,16 @@ async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     choice = update.message.text
     if choice == '/subscribe' or '🛒' in choice:
-        if user.id in ADMIN_IDS:
-            await update.message.reply_text(
-                "📦 የምዝገባ እቅድ ማስገባት የለበትም።",
-                reply_markup=get_main_keyboard(user.id)
+        await update.message.reply_text(
+            "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
+            "🍽️ የምሳ\n"
+            "🥘 የእራት\n",
+            reply_markup=ReplyKeyboardMarkup(
+                [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                resize_keyboard=True
             )
-            return MAIN_MENU
-        else:
-            await update.message.reply_text(
-                "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
-                "🍽️ የምሳ\n"
-                "🥘 የእራት\n",
-                reply_markup=ReplyKeyboardMarkup(
-                    [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
-                    resize_keyboard=True
-                )
-            )
-            return CHOOSE_PLAN
+        )
+        return CHOOSE_PLAN
     plans = {
         '🍽️ የምሳ': {'type': 'lunch', 'price_per_meal': 0, 'duration_days': 30},
         '🥘 የእራት': {'type': 'dinner', 'price_per_meal': 0, 'duration_days': 30}
@@ -634,23 +610,16 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     valid_days = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
     valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     if choice == '🔙 ተመለስ':
-        if user.id in ADMIN_IDS:
-            await update.message.reply_text(
-                "📦 የምዝገባ እቅድ ማስገባት የለበትም።",
-                reply_markup=get_main_keyboard(user.id)
+        await update.message.reply_text(
+            "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
+            "🍽️ የምሳ\n"
+            "🥘 የእራት\n",
+            reply_markup=ReplyKeyboardMarkup(
+                [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                resize_keyboard=True
             )
-            return MAIN_MENU
-        else:
-            await update.message.reply_text(
-                "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
-                "🍽️ የምሳ\n"
-                "🥘 የእራት\n",
-                reply_markup=ReplyKeyboardMarkup(
-                    [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
-                    resize_keyboard=True
-                )
-            )
-            return CHOOSE_PLAN
+        )
+        return CHOOSE_PLAN
     elif choice == 'ጨርስ':
         selected_dates = context.user_data.get('selected_dates', [])
         if not selected_dates:
@@ -820,12 +789,6 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Select meals
 async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if user.id in ADMIN_IDS:
-        await update.message.reply_text(
-            "❌ አስተዳዳሪዎች ምግብ ምርጫ ማድረግ የለባቸውም።",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
     conn = None
     cur = None
     try:
@@ -915,12 +878,6 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if user.id in ADMIN_IDS:
-        await update.message.reply_text(
-            "❌ አስተዳዳሪዎች ምግብ ምርጫ ማድረግ የለባቸውም።",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
     text = update.message.text.strip()
     menu_items = context.user_data.get('menu_items', [])
     selected_dates = context.user_data.get('selected_dates', [])
@@ -1074,12 +1031,6 @@ async def confirm_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
 
 async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if user.id in ADMIN_IDS:
-        await update.message.reply_text(
-            "❌ አስተዳዳሪዎች ምግብ ምርጫ ማድረግ የለባቸውም።",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
     user_input = update.message.text
     conn = None
     cur = None
@@ -1154,12 +1105,6 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if user.id in ADMIN_IDS:
-        await update.message.reply_text(
-            "❌ አስተዳዳሪዎች ክፍያ ማድረግ የለባቸውም።",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
     if update.message.text and update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         await update.message.reply_text(
             "❌ ምዝገባ ተሰርዟል።",
@@ -1974,9 +1919,9 @@ def main():
                 MAIN_MENU: [
                     MessageHandler(filters.Regex('^🍽 ምግብ ዝርዝር$'), show_menu),
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
-                    MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), my_subscription),
+                    MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), my_subscription),  # ✅ Updated
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
-                    MessageHandler(filters.Regex('^❓ እርዳታ አግኝ$'), help_button),
+                    MessageHandler(filters.Regex('^❓ እርዳታ አግኝ$'), help_button),  # ✅ Updated
                     MessageHandler(filters.Regex('^🍴 ምግብ ምረጥ$'), select_meals),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር አዘምን$'), admin_update_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር ሰርዝ$'), admin_delete_menu),
@@ -1991,7 +1936,7 @@ def main():
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
                 ],
                 REGISTER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name)],
-                REGISTER_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_phone)],
+                REGISTER_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_phone)],  # ✅ Manual only
                 REGISTER_LOCATION: [
                     MessageHandler(filters.LOCATION | (filters.TEXT & ~filters.COMMAND), register_location)
                 ],
