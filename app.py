@@ -336,13 +336,13 @@ async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "1️⃣ የምዝገባ እቅድዎን እና ቀን ይምረጡ\n"
         "2️⃣ የሚወዷቸውን ምግቦች ከምግብ ዝርዝር ውስጥ ይምረጡ (ወይንም ከፈለጉ በሼፍ ውሳኔ)\n"
         "3️⃣ በየቀኑ የማስታወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።\n\n"
-        "📋 የሚገኙ አማራጮች:\n"
-        "🍽 ምግብ ዝርዝር - የሳምንቱን ምግብ ዝርዝር ይመልከቱ\n"
-        "🛒 ምዝገባ - የምዝገባ እቅድ ይምረጡ\n"
-        "👤 የእኔ መረጃ - የእርስዎ መረጃ ይመልከቱ\n"
-        "📅 የእኔ ምግቦች - የመረጧቸውን ምግቦች ይመልከቱ\n"
-        "❓ እርዳታ አግኝ - ይህን የእገዛ መልእክት ይመልከቱ\n"
-        "🍴 ምግብ ምረጥ - ምግቦችዎን ይምረጡ"
+        "📋 የሚገኙ ትዕዛዞች:\n"
+        "🍽 /menu - የሳምንቱን ምግብ ዝርዝር ይመልከቱ\n"
+        "🛒 /subscribe - የምዝገባ እቅድ ይምረጡ\n"
+        "👤 /my_subscription - የእርስዎ መረጃ ይመልከቱ\n"
+        "📅 /my_meals - የመረጧቸውን ምግቦች ይመልከቱ\n"
+        "❓ /help - ይህን የእገዛ መልእክት ይመልከቱ\n"
+        "🍴 /select_meals - ምግቦችዎን ይምረጡ"
     )
     if user.id in ADMIN_IDS:
         commands_text += (
@@ -986,7 +986,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
                 return MEAL_SELECTION
         except ValueError:
             await update.message.reply_text(
-                f"❌ የማይሰራ ግብዓት '{text}'። ንጥል ያስገቡ (ለምሳሌ (1') ወይም 'ሼፍ'።",
+                f"❌ የማይሰራ ግብዓት '{text}'። ንጥል ያስገቡ (ለምሳሌ '1') ወይም 'ሼፍ'።",
                 reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
             )
             return MEAL_SELECTION
@@ -1465,10 +1465,7 @@ async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     await update.message.reply_text(
-        "📋 አዲሱን ምግብ ዝርዝር ያስገቡ, አንድ ንጥል በአንድ መስመር በቅርጽ: day category name price\n"
-        "ለምሳሌ:\n"
-        "Monday fasting ምስር ወጥ 160\n"
-        "Monday non_fasting ምስር በስጋ 260",
+        "📋 አዲሱን ምግብ ዝርዝር በJSON ቅርጽ ያስገቡ (ለምሳሌ፣ [{'id': 1, 'name': 'Dish', 'price': 100, 'day': 'Monday', 'category': 'fasting'}])።",
         reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
     )
     return ADMIN_UPDATE_MENU
@@ -1482,29 +1479,9 @@ async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text("❌ የምግብ ዝርዝር ማዘመን ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     try:
-        lines = update.message.text.strip().split('\n')
-        menu_data = []
-        for idx, line in enumerate(lines, 1):
-            parts = line.strip().split()
-            if len(parts) < 4:
-                raise ValueError(f"Invalid format on line {idx}: {line}")
-            day = parts[0]
-            category = parts[1]
-            price = float(parts[-1])
-            name = ' '.join(parts[2:-1])
-            if day not in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']:
-                raise ValueError(f"Invalid day on line {idx}: {day}")
-            if category not in ['fasting', 'non_fasting']:
-                raise ValueError(f"Invalid category on line {idx}: {category}")
-            menu_data.append({
-                'id': idx,
-                'name': name,
-                'price': price,
-                'day': day,
-                'category': category
-            })
-        if not menu_data:
-            raise ValueError("No valid menu items provided.")
+        menu_data = json.loads(update.message.text)
+        if not isinstance(menu_data, list):
+            raise ValueError("Menu must be a JSON list.")
         today = datetime.now(EAT).date()
         week_start = today - timedelta(days=today.weekday())
         conn = get_db_connection()
@@ -1519,7 +1496,7 @@ async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAUL
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error updating menu: {e}")
-        await update.message.reply_text(f"❌ የማይሰራ ቅርጽ ወይም ምግብ ዝርዝር ማዘመን ላይ ስህተት: {str(e)}። እባክዎ እንደገና ይሞክሩ።", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ የማይሰራ JSON ወይም ምግብ ዝርዝር ማዘመን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
         return ADMIN_UPDATE_MENU
     finally:
         if 'cur' in locals():
@@ -1911,6 +1888,12 @@ def main():
         conv_handler = ConversationHandler(
             entry_points=[
                 CommandHandler('start', start),
+                CommandHandler('help', send_help_text),
+                CommandHandler('menu', show_menu),
+                CommandHandler('subscribe', choose_plan),
+                CommandHandler('my_subscription', my_subscription),
+                CommandHandler('my_meals', my_meals),
+                CommandHandler('select_meals', select_meals),
                 CommandHandler('admin_update_menu', admin_update_menu),
                 CommandHandler('admin_delete_menu', admin_delete_menu),
                 CommandHandler('admin_subscribers', admin_subscribers),
@@ -1991,4 +1974,4 @@ def main():
         logger.error(f"Error starting bot: {e}")
 
 if __name__ == '__main__':
-    main()
+    main() 
