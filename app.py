@@ -247,7 +247,7 @@ def get_main_keyboard(user_id):
     keyboard = [
         ['🍽 ምግብ ዝርዝር', '🛒 ምዝገባ'],
         ['📋 የእኔ ምዝገባ', '📅 የእኔ ምግቦች'],
-        ['📞 እውቂያ', '🍴 ምግብ ምረጥ']
+        ['📱 ስልክ ቁጥር', '🍴 ምግብ ምረጥ']  # ✅ Updated from "📞 እውቂያ"
     ]
     if user_id in ADMIN_IDS:
         keyboard.extend([
@@ -335,8 +335,8 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return MAIN_MENU
 
-# Help command (unchanged content, just uses main keyboard)
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Help command (used after payment approval)
+async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     commands_text = (
         "👋 እንኳን ወደ ኦዝ ኪችን የምግብ ምዝገባ በደና መጡ!\n"
@@ -344,13 +344,13 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "የአገልግሎቱ መግለጫዎች እና ሂደቶች?\n"
         "1️⃣ የምዝገባ እቅድዎን እና ቀን ይምረጡ\n"
         "2️⃣ የሚወዷቸውን ምግቦች ከምግብ ዝርዝር ውስጥ ይምረጡ (ወይንም ከፈለጉ በሼፍ ውሳኔ)\n"
-        "3️⃣ በየቀኑ የማስታወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።\n"
+        "3️⃣ በየቀኑ የማስታወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።\n\n"
         "📋 የሚገኙ ትዕዛዞች:\n"
         "🍽 /menu - የሳምንቱን ምግብ ዝርዝር ይመልከቱ\n"
         "🛒 /subscribe - የምዝገባ እቅድ ይምረጡ\n"
         "📋 /my_subscription - የምዝገባ ሁኔታን ይመልከቱ\n"
         "📅 /my_meals - የመረጧቸውን ምግቦች ይመልከቱ\n"
-        "📞 /contact - ስልክ ቁጥር ያዘምኑ\n"
+        "📱 /contact - ስልክ ቁጥር ያዘምኑ\n"
         "❓ /help - ይህን የእገዛ መልእክት ይመልከቱ\n"
         "🍴 /select_meals - ምግቦችዎን ይምረጡ"
     )
@@ -367,14 +367,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/setadminlocation - የካፌ ቦታ ያዘጋጁ\n"
             "/viewlocations - የተጋሩ ቦታዎችን ይመልከቱ"
         )
-    await update.message.reply_text(
-        commands_text,
-        reply_markup=get_main_keyboard(user.id)
-    )
-    return MAIN_MENU
+    await update.message.reply_text(commands_text, reply_markup=get_main_keyboard(user.id))
 
-# Registration: Full name
+# Registration: Full name ✅ (FIXED: now properly starts here)
 async def register_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if update.message.text == '🔙 ተመለስ':
+        return await back_to_main(update, context)
+    await update.message.reply_text(
+        "እባክዎ ሙሉ ስምዎን ያስገቡ።",
+        reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+    )
+    return REGISTER_NAME
+
+async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if update.message.text == '🔙 ተመለስ':
         return await back_to_main(update, context)
@@ -1334,11 +1340,14 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             )
             conn.commit()
             await query.message.reply_text("✅ ክፍያ ተቀበለ።")
+            # ✅ Send help text after approval
             await context.bot.send_message(
                 chat_id=user_id,
-                text="✅ የእርስዎ ክፍያ ተቀበለ! ምግቦችዎ ተደረጉ።",
-                reply_markup=get_main_keyboard(user_id)
+                text="✅ የእርስዎ ክፍያ ተቀበለ! ምግቦችዎ ተደረጉ።"
             )
+            # Send full command list
+            fake_update = Update(0, message=type('obj', (object,), {'effective_user': type('obj', (object,), {'id': user_id})}))
+            await send_help_text(fake_update, context)
         elif action == 'reject':
             cur.execute(
                 "UPDATE public.payments SET status = 'rejected' WHERE id = %s",
@@ -1895,7 +1904,7 @@ def main():
         conv_handler = ConversationHandler(
             entry_points=[
                 CommandHandler('start', start),
-                CommandHandler('help', help_command),
+                CommandHandler('help', send_help_text),
                 CommandHandler('menu', show_menu),
                 CommandHandler('subscribe', choose_plan),
                 CommandHandler('my_subscription', my_subscription),
@@ -1919,7 +1928,7 @@ def main():
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
                     MessageHandler(filters.Regex('^📋 የእኔ ምዝገባ$'), my_subscription),
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
-                    MessageHandler(filters.Regex('^📞 እውቂያ$'), contact),
+                    MessageHandler(filters.Regex('^📱 ስልክ ቁጥር$'), contact),  # ✅ Updated
                     MessageHandler(filters.Regex('^🍴 ምግብ ምረጥ$'), select_meals),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር አዘምን$'), admin_update_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር ሰርዝ$'), admin_delete_menu),
@@ -1930,10 +1939,10 @@ def main():
                     MessageHandler(filters.Regex('^🔐 ማስታወቂያ$'), admin_announce),
                     MessageHandler(filters.Regex('^🔐 ቦታ አዘጋጅ$'), set_admin_location),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን ተመልከት$'), view_locations),
-                    MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),
+                    MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),  # Starts name input
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
                 ],
-                REGISTER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_name)],
+                REGISTER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name)],  # ✅ Fixed
                 REGISTER_PHONE: [
                     MessageHandler(filters.CONTACT | (filters.TEXT & ~filters.COMMAND), register_phone)
                 ],
