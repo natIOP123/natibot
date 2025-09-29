@@ -235,11 +235,13 @@ def build_delete_menu_text(menu_items, week_start):
     return text
 
 def get_main_keyboard(user_id):
-    keyboard = [
-        ['🍽 ምግብ ዝርዝር', '🛒 ምዝገባ'],
-        ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች'],  # ✅ Updated
-        ['❓ እርዳታ አግኝ', '🍴 ምግብ ምረጥ']   # ✅ Updated
-    ]
+    keyboard = []
+    if user_id not in ADMIN_IDS:
+        keyboard.extend([
+            ['🍽 ምግብ ዝርዝር', '🛒 ምዝገባ'],
+            ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች'],  # ✅ Updated
+            ['❓ እርዳታ አግኝ', '🍴 ምግብ ምረጥ']   # ✅ Updated
+        ])
     if user_id in ADMIN_IDS:
         keyboard.extend([
             ['🔐 ምግብ ዝርዝር አዘምን', '🔐 ምግብ ዝርዝር ሰርዝ'],
@@ -270,7 +272,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Check if user is registered
         cur.execute("SELECT full_name, phone_number FROM public.users WHERE telegram_id = %s", (user.id,))
         user_data = cur.fetchone()
-        if user_data and user_data[0] and user_data[1]:
+        if user_data and user_data[0] and user_data[1] or user.id in ADMIN_IDS:
             # Show full main menu
             await update.message.reply_text(
                 f"👋 እንኳን ተመልሰው መጡ {user.first_name}!\n{onboarding_text}",
@@ -297,6 +299,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Support handler
 async def support_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     await update.message.reply_text(
         "📞 የአስተዳዳሪውን ያግኙ፡ 0940406707",
         reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
@@ -312,7 +317,7 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = cur.fetchone()
     cur.close()
     conn.close()
-    if user_data and user_data[0] and user_data[1]:
+    if user_data and user_data[0] and user_data[1] or user.id in ADMIN_IDS:
         await update.message.reply_text(
             "🧾 ወደ ዋና ገጽ ተመለስተዋል።",
             reply_markup=get_main_keyboard(user.id)
@@ -329,6 +334,9 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Help command (used after payment approval and for "እርዳታ አግኝ")
 async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
     commands_text = (
         "👋 እንኳን ወደ ኦዝ ኪችን የምግብ ምዝገባ በደና መጡ!\n"
         "ትኩስ እና ጣፋጭ ምግቦችን በነጻ ለእርስዎ እናደርሳለን።\n"
@@ -361,6 +369,9 @@ async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Registration: Full name
 async def register_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     user = update.effective_user
     if update.message.text == '🔙 ተመለስ':
         return await back_to_main(update, context)
@@ -371,6 +382,9 @@ async def register_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return REGISTER_NAME
 
 async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     user = update.effective_user
     if update.message.text == '🔙 ተመለስ':
         return await back_to_main(update, context)
@@ -405,6 +419,9 @@ async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Registration: Phone number (manual input only)
 async def register_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     user = update.effective_user
     if update.message.text == '🔙 ተመለስ':
         return await back_to_main(update, context)
@@ -448,6 +465,9 @@ async def register_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Registration: Location
 async def register_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     user = update.effective_user
     if update.message.text == '🔙 ተመለስ':
         return await back_to_main(update, context)
@@ -517,6 +537,9 @@ async def register_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Confirm registration
 async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     user = update.effective_user
     choice = update.message.text
     if choice == '🔙 ተመለስ':
@@ -553,6 +576,9 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
 # Choose subscription plan
 async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
     choice = update.message.text
     if choice == '/subscribe' or '🛒' in choice:
         await update.message.reply_text(
@@ -596,20 +622,26 @@ async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Choose dates
 async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
     choice = update.message.text
     valid_days = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
     valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     if choice == '🔙 ተመለስ':
-        await update.message.reply_text(
-            "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
-            "🍽️ የምሳ\n"
-            "🥘 የእራት\n",
-            reply_markup=ReplyKeyboardMarkup(
-                [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
-                resize_keyboard=True
+        if user.id in ADMIN_IDS:
+            return await back_to_main(update, context)
+        else:
+            await update.message.reply_text(
+                "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
+                "🍽️ የምሳ\n"
+                "🥘 የእራት\n",
+                reply_markup=ReplyKeyboardMarkup(
+                    [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                    resize_keyboard=True
+                )
             )
-        )
-        return CHOOSE_PLAN
+            return CHOOSE_PLAN
     elif choice == 'ጨርስ':
         selected_dates = context.user_data.get('selected_dates', [])
         if not selected_dates:
@@ -715,6 +747,9 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Show weekly menu
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     conn = None
     cur = None
     try:
@@ -778,6 +813,9 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Select meals
 async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     user = update.effective_user
     conn = None
     cur = None
@@ -867,6 +905,9 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.close()
 
 async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     user = update.effective_user
     text = update.message.text.strip()
     menu_items = context.user_data.get('menu_items', [])
@@ -997,6 +1038,9 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
     return MEAL_SELECTION
 
 async def confirm_meal_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     selected_meals = context.user_data.get('selected_meals', {})
     total_price = 0
     order_text = "የመረጡት ቀን እና ምግብ ዝርዝር\n"
@@ -1020,6 +1064,9 @@ async def confirm_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
     return CONFIRM_MEAL
 
 async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     user = update.effective_user
     user_input = update.message.text
     conn = None
@@ -1094,6 +1141,9 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return MAIN_MENU
 
 async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     user = update.effective_user
     if update.message.text and update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         await update.message.reply_text(
@@ -1370,6 +1420,9 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
 
 # My Subscription → My Info
 async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     user = update.effective_user
     conn = None
     cur = None
@@ -1416,6 +1469,9 @@ async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # My Meals
 async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     user = update.effective_user
     conn = None
     cur = None
@@ -1455,6 +1511,9 @@ async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Help button handler
 async def help_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id in ADMIN_IDS:
+        await update.message.reply_text("ይህ ባህሪ ለተጠቃሚዎች ብቻ ነው።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     await send_help_text(update, context)
     return MAIN_MENU
 
@@ -1926,7 +1985,7 @@ def main():
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
                 ],
                 REGISTER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name)],
-                REGISTER_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_phone)],  # ✅ Manual only
+                REGISTER_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_phone)],
                 REGISTER_LOCATION: [
                     MessageHandler(filters.LOCATION | (filters.TEXT & ~filters.COMMAND), register_location)
                 ],
@@ -1974,4 +2033,4 @@ def main():
         logger.error(f"Error starting bot: {e}")
 
 if __name__ == '__main__':
-    main() 
+    main()
