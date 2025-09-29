@@ -209,15 +209,6 @@ def init_db():
         cur.execute("SELECT COUNT(*) FROM public.categories")
         if cur.fetchone()[0] == 0:
             cur.execute("INSERT INTO public.categories (name) VALUES ('Main Dishes'), ('Sides'), ('Drinks'), ('Desserts')")
-        # Insert default menu for current week if not exists
-        today = datetime.now(EAT).date()
-        week_start = today - timedelta(days=today.weekday())
-        cur.execute("SELECT 1 FROM public.weekly_menus WHERE week_start_date = %s", (week_start,))
-        if not cur.fetchone():
-            cur.execute(
-                "INSERT INTO public.weekly_menus (week_start_date, menu_items) VALUES (%s, %s)",
-                (week_start, json.dumps(default_menu))
-            )
         conn.commit()
         logger.info("Database initialized successfully")
     except Exception as e:
@@ -251,9 +242,12 @@ async def ensure_user_exists(user, conn, cur):
         return False
 
 def build_delete_menu_text(menu_items, week_start):
+    valid_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    day_order = {day: idx for idx, day in enumerate(valid_days)}
+    sorted_items = sorted(menu_items, key=lambda x: day_order.get(x['day'], len(valid_days)))
     text = f"📋 የምግብ ዝርዝር ለሳምንቱ መጀመሪያ {week_start} (ለመሰረዝ የተወሰነ ንጥል ይምረጡ):\n"
-    for idx, item in enumerate(menu_items, 1):
-        text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n"
+    for idx, item in enumerate(sorted_items, 1):
+        text += f"{idx}. {item['day']}: {item['name']} - {item['price']:.2f} ብር\n"
     return text
 
 def get_main_keyboard(user_id):
@@ -767,10 +761,13 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if isinstance(item, dict) and all(key in item for key in ['id', 'name', 'price', 'category'])
             ]
         else:
-            valid_items = []
+            valid_items = [
+                item for item in default_menu 
+                if isinstance(item, dict) and all(key in item for key in ['id', 'name', 'price', 'category'])
+            ]
         if not valid_items:
             await update.message.reply_text(
-                "❌ ለዚህ ሳምንት ተገቢ የምግብ ንጥሎች የሉም። እባክዎ ድጋፍ ያነጋግሩ።",
+                "❌ ለዚህ ሳምንት ተገቢ የምግብ ንጥሎች የሉም።",
                 reply_markup=get_main_keyboard(update.effective_user.id)
             )
             return MAIN_MENU
@@ -843,15 +840,9 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if valid_menu_items:
                 menu_items = valid_menu_items
             else:
-                menu_items = []
+                menu_items = default_menu
         else:
-            menu_items = []
-        if not menu_items:
-            await update.message.reply_text(
-                "❌ ለዚህ ሳምንት ምግብ ዝርዝር የለም። እባክዎ ድጋፍ ያነጋግሩ።",
-                reply_markup=get_main_keyboard(user.id)
-            )
-            return MAIN_MENU
+            menu_items = default_menu
         context.user_data['subscription_id'] = subscription_id
         context.user_data['menu_items'] = menu_items
         context.user_data['meals_remaining'] = meals_remaining
@@ -1474,7 +1465,7 @@ async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     await update.message.reply_text(
-        "📋 አዲሱን ምግብ ዝርዝር በጽሑፍ ያስገቡ፣ አንድ ንጥል በመስመር (ለምሳሌ:\n1. ምስር ወጥ 160 fasting\n2. ጎመን 160 fasting):",
+        "📋 አዲሱን ምግብ ዝርዝር በJSON ቅርጽ ያስገቡ (ለምሳሌ፣ [{'id': 1, 'name': 'Dish', 'price': 100, 'day': 'Monday', 'category': 'fasting'}])።",
         reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
     )
     return ADMIN_UPDATE_MENU
@@ -1488,29 +1479,9 @@ async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text("❌ የምግብ ዝርዝር ማዘመን ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     try:
-        lines = [line.strip() for line in update.message.text.split('\n') if line.strip()]
-        menu_data = []
-        for line in lines:
-            parts = re.split(r'\.\s*', line, 1)
-            if len(parts) == 2:
-                num_str, rest = parts
-                rest_parts = rest.split()
-                if len(rest_parts) >= 3:
-                    name = ' '.join(rest_parts[:-2])
-                    try:
-                        price = float(rest_parts[-2])
-                        category = rest_parts[-1]
-                        if category in ['fasting', 'non_fasting']:
-                            menu_data.append({
-                                'id': len(menu_data) + 1,
-                                'name': name,
-                                'price': price,
-                                'category': category
-                            })
-                    except ValueError:
-                        continue
-        if not menu_data:
-            raise ValueError("No valid menu items parsed.")
+        menu_data = json.loads(update.message.text)
+        if not isinstance(menu_data, list):
+            raise ValueError("Menu must be a JSON list.")
         today = datetime.now(EAT).date()
         week_start = today - timedelta(days=today.weekday())
         conn = get_db_connection()
@@ -1525,7 +1496,7 @@ async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAUL
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error updating menu: {e}")
-        await update.message.reply_text("❌ የማይሰራ ጽሑፍ ወይም ምግብ ዝርዝር ማዘመን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ የማይሰራ JSON ወይም ምግብ ዝርዝር ማዘመን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
         return ADMIN_UPDATE_MENU
     finally:
         if 'cur' in locals():
@@ -2012,6 +1983,7 @@ def main():
                 sleep(10)
     except Exception as e:
         logger.error(f"Error starting bot: {e}")
+
 
 
 if __name__ == '__main__':
