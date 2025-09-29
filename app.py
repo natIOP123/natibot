@@ -1,4 +1,3 @@
-
 import os
 import logging
 import json
@@ -39,6 +38,22 @@ DELIVERY_POLYGON = Polygon([(lon, lat) for lat, lon in ADMIN_LOCATIONS])
 
 # Time zone for East Africa Time (EAT, UTC+3)
 EAT = pytz.timezone('Africa/Nairobi')
+
+# Default menu fallback
+default_menu = [
+    {'id': 1, 'name': 'ምስር ወጥ', 'price': 160.00, 'category': 'fasting'},
+    {'id': 2, 'name': 'ጎመን', 'price': 160.00, 'category': 'fasting'},
+    {'id': 3, 'name': 'ሽሮ', 'price': 160.00, 'category': 'fasting'},
+    {'id': 4, 'name': 'ፓስታ', 'price': 160.00, 'category': 'fasting'},
+    {'id': 5, 'name': 'ፍርፍር', 'price': 160.00, 'category': 'fasting'},
+    {'id': 6, 'name': 'የጾም በሼፍ ውሳኔ', 'price': 160.00, 'category': 'fasting'},
+    {'id': 7, 'name': 'ምስር በስጋ', 'price': 260.00, 'category': 'non_fasting'},
+    {'id': 8, 'name': 'ጎመን በስጋ', 'price': 260.00, 'category': 'non_fasting'},
+    {'id': 9, 'name': 'ቦዘና ሽሮ', 'price': 260.00, 'category': 'non_fasting'},
+    {'id': 10, 'name': 'ፓስታ በስጋ', 'price': 260.00, 'category': 'non_fasting'},
+    {'id': 11, 'name': 'ጥብስ/ቋንጣ ፍርፍር', 'price': 260.00, 'category': 'non_fasting'},
+    {'id': 12, 'name': 'የፍስክ በሼፍ ውሳኔ', 'price': 260.00, 'category': 'non_fasting'}
+]
 
 # Conversation states
 (
@@ -730,44 +745,53 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Show weekly menu
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    today = datetime.now(EAT).date()
-    week_start = today - timedelta(days=today.weekday())
-    default_menu = [
-        {'id': 1, 'name': 'ምስር ወጥ', 'price': 160.00, 'category': 'fasting'},
-        {'id': 2, 'name': 'ጎመን', 'price': 160.00, 'category': 'fasting'},
-        {'id': 3, 'name': 'ሽሮ', 'price': 160.00, 'category': 'fasting'},
-        {'id': 4, 'name': 'ፓስታ', 'price': 160.00, 'category': 'fasting'},
-        {'id': 5, 'name': 'ፍርፍር', 'price': 160.00, 'category': 'fasting'},
-        {'id': 6, 'name': 'የጾም በሼፍ ውሳኔ', 'price': 160.00, 'category': 'fasting'},
-        {'id': 7, 'name': 'ምስር በስጋ', 'price': 260.00, 'category': 'non_fasting'},
-        {'id': 8, 'name': 'ጎመን በስጋ', 'price': 260.00, 'category': 'non_fasting'},
-        {'id': 9, 'name': 'ቦዘና ሽሮ', 'price': 260.00, 'category': 'non_fasting'},
-        {'id': 10, 'name': 'ፓስታ በስጋ', 'price': 260.00, 'category': 'non_fasting'},
-        {'id': 11, 'name': 'ጥብስ/ቋንጣ ፍርፍር', 'price': 260.00, 'category': 'non_fasting'},
-        {'id': 12, 'name': 'የፍስክ በሼፍ ውሳኔ', 'price': 260.00, 'category': 'non_fasting'}
-    ]
-    valid_items = [
-        item for item in default_menu 
-        if isinstance(item, dict) and all(key in item for key in ['id', 'name', 'price', 'category'])
-    ]
-    if not valid_items:
-        await update.message.reply_text(
-            "❌ ለዚህ ሳምንት ተገቢ የምግብ ንጥሎች የሉም።",
-            reply_markup=get_main_keyboard(update.effective_user.id)
-        )
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        today = datetime.now(EAT).date()
+        week_start = today - timedelta(days=today.weekday())
+        cur.execute("SELECT menu_items FROM public.weekly_menus WHERE week_start_date = %s", (week_start,))
+        menu_result = cur.fetchone()
+        if menu_result and menu_result[0]:
+            menu_items = json.loads(menu_result[0]) if isinstance(menu_result[0], str) else menu_result[0]
+            valid_items = [
+                item for item in menu_items 
+                if isinstance(item, dict) and all(key in item for key in ['id', 'name', 'price', 'category'])
+            ]
+        else:
+            valid_items = [
+                item for item in default_menu 
+                if isinstance(item, dict) and all(key in item for key in ['id', 'name', 'price', 'category'])
+            ]
+        if not valid_items:
+            await update.message.reply_text(
+                "❌ ለዚህ ሳምንት ተገቢ የምግብ ንጥሎች የሉም።",
+                reply_markup=get_main_keyboard(update.effective_user.id)
+            )
+            return MAIN_MENU
+        menu_text = f"📋 የምግብ ዝርዝር ለሳምንቱ መጀመሪያ {week_start}:\n"
+        menu_text += "የጾም ምግብ ዝርዝር\n"
+        fasting_items = [item for item in valid_items if item['category'] == 'fasting']
+        for idx, item in enumerate(fasting_items, 1):
+            menu_text += f"{idx}. {item['name']} …….. {item['price']:.2f} ብር\n"
+        menu_text += "\nየፍስክ ምግብ ዝርዝር\n"
+        non_fasting_items = [item for item in valid_items if item['category'] == 'non_fasting']
+        for idx, item in enumerate(non_fasting_items, 1):
+            menu_text += f"{idx + len(fasting_items)}. {item['name']} …….. {item['price']:.2f} ብር\n"
+        menu_text += "\nምግቦችዎን ለመምረጥ /select_meals ይጠቀሙ።"
+        await update.message.reply_text(menu_text, reply_markup=get_main_keyboard(update.effective_user.id))
         return MAIN_MENU
-    menu_text = f"📋 የምግብ ዝርዝር ለሳምንቱ መጀመሪያ {week_start}:\n"
-    menu_text += "የጾም ምግብ ዝርዝር\n"
-    fasting_items = [item for item in valid_items if item['category'] == 'fasting']
-    for idx, item in enumerate(fasting_items, 1):
-        menu_text += f"{idx}. {item['name']} …….. {item['price']:.2f} ብር\n"
-    menu_text += "\nየፍስክ ምግብ ዝርዝር\n"
-    non_fasting_items = [item for item in valid_items if item['category'] == 'non_fasting']
-    for idx, item in enumerate(non_fasting_items, 1):
-        menu_text += f"{idx + len(fasting_items)}. {item['name']} …….. {item['price']:.2f} ብር\n"
-    menu_text += "\nምግቦችዎን ለመምረጥ /select_meals ይጠቀሙ።"
-    await update.message.reply_text(menu_text, reply_markup=get_main_keyboard(update.effective_user.id))
-    return MAIN_MENU
+    except Exception as e:
+        logger.error(f"Error in show_menu: {e}")
+        await update.message.reply_text("❌ ምግብ ዝርዝር መጫን ላይ ስህተት።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 # Select meals
 async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -802,32 +826,34 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         valid_days_am = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
         selected_dates = [valid_days_am[valid_days_en.index(day)] for day in selected_dates_en]
-        default_menu = [
-            {'id': 1, 'name': 'ምስር ወጥ', 'price': 160.00, 'category': 'fasting'},
-            {'id': 2, 'name': 'ጎመን', 'price': 160.00, 'category': 'fasting'},
-            {'id': 3, 'name': 'ሽሮ', 'price': 160.00, 'category': 'fasting'},
-            {'id': 4, 'name': 'ፓስታ', 'price': 160.00, 'category': 'fasting'},
-            {'id': 5, 'name': 'ፍርፍር', 'price': 160.00, 'category': 'fasting'},
-            {'id': 6, 'name': 'የጾም በሼፍ ውሳኔ', 'price': 160.00, 'category': 'fasting'},
-            {'id': 7, 'name': 'ምስር በስጋ', 'price': 260.00, 'category': 'non_fasting'},
-            {'id': 8, 'name': 'ጎመን በስጋ', 'price': 260.00, 'category': 'non_fasting'},
-            {'id': 9, 'name': 'ቦዘና ሽሮ', 'price': 260.00, 'category': 'non_fasting'},
-            {'id': 10, 'name': 'ፓስታ በስጋ', 'price': 260.00, 'category': 'non_fasting'},
-            {'id': 11, 'name': 'ጥብስ/ቋንጣ ፍርፍር', 'price': 260.00, 'category': 'non_fasting'},
-            {'id': 12, 'name': 'የፍስክ በሼፍ ውሳኔ', 'price': 260.00, 'category': 'non_fasting'}
-        ]
+        # Fetch current menu
+        today = datetime.now(EAT).date()
+        week_start = today - timedelta(days=today.weekday())
+        cur.execute("SELECT menu_items FROM public.weekly_menus WHERE week_start_date = %s", (week_start,))
+        menu_result = cur.fetchone()
+        if menu_result and menu_result[0]:
+            menu_items_from_db = json.loads(menu_result[0]) if isinstance(menu_result[0], str) else menu_result[0]
+            valid_menu_items = [
+                item for item in menu_items_from_db 
+                if isinstance(item, dict) and all(key in item for key in ['id', 'name', 'price', 'category'])
+            ]
+            if valid_menu_items:
+                menu_items = valid_menu_items
+            else:
+                menu_items = default_menu
+        else:
+            menu_items = default_menu
         context.user_data['subscription_id'] = subscription_id
-        context.user_data['menu_items'] = default_menu
+        context.user_data['menu_items'] = menu_items
         context.user_data['meals_remaining'] = meals_remaining
         context.user_data['selected_dates'] = selected_dates
         context.user_data['selected_dates_en'] = selected_dates_en
-        today = datetime.now(EAT).date()
-        context.user_data['week_start'] = today - timedelta(days=today.weekday())
+        context.user_data['week_start'] = week_start
         context.user_data['selected_meals'] = {day: [] for day in selected_dates}
         context.user_data['current_day_index'] = 0
         first_day = selected_dates[0]
-        fasting_items = [item for item in default_menu if item['category'] == 'fasting']
-        non_fasting_items = [item for item in default_menu if item['category'] == 'non_fasting']
+        fasting_items = [item for item in menu_items if item['category'] == 'fasting']
+        non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
         menu_text = (
             f"📜 ለ{first_day} ምግብ ይምረጡ:\n"
             f"የተመረጡ ቀናት: {', '.join(selected_dates)}\n"
@@ -1010,8 +1036,9 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             context.user_data.clear()
             return MAIN_MENU
-        fasting_items = [item for item in context.user_data.get('menu_items', []) if item['category'] == 'fasting']
-        non_fasting_items = [item for item in context.user_data.get('menu_items', []) if item['category'] == 'non_fasting']
+        menu_items = context.user_data.get('menu_items', default_menu)
+        fasting_items = [item for item in menu_items if item['category'] == 'fasting']
+        non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
         menu_text = (
             f"📜 ለመረጡት ቀናት ምግቦች እንደገና ይምረጡ:\n"
             f"የተመረጡ ቀናት: {', '.join(selected_dates)}\n"
