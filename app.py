@@ -1,3 +1,4 @@
+
 import os
 import logging
 import json
@@ -825,30 +826,26 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['selected_meals'] = {day: [] for day in selected_dates}
         context.user_data['current_day_index'] = 0
         first_day = selected_dates[0]
+        fasting_items = [item for item in default_menu if item['category'] == 'fasting']
+        non_fasting_items = [item for item in default_menu if item['category'] == 'non_fasting']
         menu_text = (
             f"📜 ለ{first_day} ምግብ ይምረጡ:\n"
             f"የተመረጡ ቀናት: {', '.join(selected_dates)}\n"
             f"ቀሪ ምግቦች: {meals_remaining}\n"
-            "የጾም ምግብ ዝርዝር (160.00 ብር ለእያንዳንዱ):\n"
-            "1. ምስር ወጥ\n"
-            "2. ጎመን\n"
-            "3. ሽሮ\n"
-            "4. ፓስታ\n"
-            "5. ፍርፍር\n"
-            "6. የጾም በሼፍ ውሳኔ\n"
-            "የፍስክ ምግብ ዝርዝር (260.00 ብር ለእያንዳንዱ):\n"
-            "7. ምስር በስጋ\n"
-            "8. ጎመን በስጋ\n"
-            "9. ቦዘና ሽሮ\n"
-            "10. ፓስታ በስጋ\n"
-            "11. ጥብስ/ቋንጣ ፍርፍር\n"
-            "12. የፍስክ በሼፍ ውሳኔ\n"
-            f"📝 ለ{first_day} የምግብ ቁጥር ያስገቡ (ለምሳሌ፣ '1' ወይም 'ሼፍ' ለሼፍ ውሳኔ)።\n"
+            "የጾም ምግብ ዝርዝር:\n"
+        )
+        for idx, item in enumerate(fasting_items, 1):
+            menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n"
+        menu_text += "የፍስክ ምግብ ዝርዝር:\n"
+        for idx, item in enumerate(non_fasting_items, 1):
+            menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n"
+        menu_text += (
+            f"📝 ለ{first_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n"
             "ለመሰረዝ 'ሰርዝ' ይፃፉ።"
         )
         await update.message.reply_text(
             menu_text,
-            reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
+            reply_markup=ReplyKeyboardMarkup([['ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
         )
         return MEAL_SELECTION
     except Exception as e:
@@ -890,33 +887,32 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
         if not context.user_data['selected_meals'][selected_dates[current_day_index]]:
             await update.message.reply_text(
                 "❌ ቢያንስ አንድ ምግብ ይምረጡ ለዚህ ቀን።",
-                reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
+                reply_markup=ReplyKeyboardMarkup([['ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
             )
             return MEAL_SELECTION
         context.user_data['current_day_index'] = current_day_index + 1
         if current_day_index + 1 >= len(selected_dates):
             return await confirm_meal_selection(update, context)
         current_day = selected_dates[current_day_index + 1]
-        await update.message.reply_text(
+        fasting_items = [item for item in menu_items if item['category'] == 'fasting']
+        non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
+        menu_text = (
             f"📜 ለ{current_day} ምግብ ይምረጡ:\n"
-            "የጾም ምግብ ዝርዝር (160.00 ብር ለእያንዳንዱ):\n"
-            "1. ምስር ወጥ\n"
-            "2. ጎመን\n"
-            "3. ሽሮ\n"
-            "4. ፓስታ\n"
-            "5. ፍርፍር\n"
-            "6. የጾም በሼፍ ውሳኔ\n"
-            "የፍስክ ምግብ ዝርዝር (260.00 ብር ለእያንዳንዱ):\n"
-            "7. ምስር በስጋ\n"
-            "8. ጎመን በስጋ\n"
-            "9. ቦዘና ሽሮ\n"
-            "10. ፓስታ በስጋ\n"
-            "11. ጥብስ/ቋንጣ ፍርፍር\n"
-            "12. የፍስክ በሼፍ ውሳኔ\n"
-            f"📝 ለ{current_day} የምግብ ቁጥር ያስገቡ (ለምሳሌ፣ '1' ወይም 'ሼፍ' ለሼፍ ውሳኔ)።\n"
+            "የጾም ምግብ ዝርዝር:\n"
+        )
+        for idx, item in enumerate(fasting_items, 1):
+            menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n"
+        menu_text += "የፍስክ ምግብ ዝርዝር:\n"
+        for idx, item in enumerate(non_fasting_items, 1):
+            menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n"
+        menu_text += (
+            f"📝 ለ{current_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n"
             "ለመሰረዝ 'ሰርዝ' ይፃፉ።\n"
-            "ተጨማሪ ምግብ ይጨምሩ ወይም 'ቀጣይ ቀን' ይጫኑ።",
-            reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
+            "ተጨማሪ ምግብ ይጨምሩ ወይም 'ቀጣይ ቀን' ይጫኑ።"
+        )
+        await update.message.reply_text(
+            menu_text,
+            reply_markup=ReplyKeyboardMarkup([['ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
         )
         return MEAL_SELECTION
     if text == 'ጨርስ':
@@ -935,11 +931,10 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
         context.user_data.clear()
         return MAIN_MENU
     selected_meals = context.user_data.get('selected_meals', {current_day: []})
-    if text.lower() == 'ሼፍ':
-        category = 'fasting' if current_day_index % 2 == 0 else 'non_fasting'
-        available_items = [item for item in menu_items if item.get('category') == category]
-        if available_items:
-            item = available_items[0]
+    try:
+        item_idx = int(text) - 1
+        if 0 <= item_idx < len(menu_items):
+            item = menu_items[item_idx]
             meal_date = week_start + timedelta(days=valid_days_en.index(current_day_en))
             selected_meals[current_day].append({
                 'day': current_day,
@@ -949,45 +944,23 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             })
             context.user_data['selected_meals'] = selected_meals
             await update.message.reply_text(
-                f"✅ ለ{current_day} በሼፍ ውሳኔ: {item['name']} ተመረጠ።"
+                f"✅ ለ{current_day} {item['name']} ተመረጠ።"
             )
         else:
             await update.message.reply_text(
-                f"❌ ለ{current_day} በ{category} ምድብ ምግብ የለም። እባክዎ በእጅ ይምረጡ።",
-                reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
+                f"❌ የማይሰራ የምግብ ቁጥር {text}። 1 እስከ {len(menu_items)} መካከል ይምረጡ።",
+                reply_markup=ReplyKeyboardMarkup([['ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
             )
             return MEAL_SELECTION
-    else:
-        try:
-            item_idx = int(text) - 1
-            if 0 <= item_idx < len(menu_items):
-                item = menu_items[item_idx]
-                meal_date = week_start + timedelta(days=valid_days_en.index(current_day_en))
-                selected_meals[current_day].append({
-                    'day': current_day,
-                    'day_en': current_day_en,
-                    'item': item,
-                    'meal_date': meal_date
-                })
-                context.user_data['selected_meals'] = selected_meals
-                await update.message.reply_text(
-                    f"✅ ለ{current_day} {item['name']} ተመረጠ።"
-                )
-            else:
-                await update.message.reply_text(
-                    f"❌ የማይሰራ የምግብ ቁጥር {text}። 1 እስከ {len(menu_items)} መካከል ይምረጡ።",
-                    reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
-                )
-                return MEAL_SELECTION
-        except ValueError:
-            await update.message.reply_text(
-                f"❌ የማይሰራ ግብዓት '{text}'። ንጥል ያስገቡ (ለምሳሌ '1') ወይም 'ሼፍ'።",
-                reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
-            )
-            return MEAL_SELECTION
+    except ValueError:
+        await update.message.reply_text(
+            f"❌ የማይሰራ ግብዓት '{text}'። ንጥል ያስገቡ (ለምሳሌ '1')።",
+            reply_markup=ReplyKeyboardMarkup([['ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
+        )
+        return MEAL_SELECTION
     await update.message.reply_text(
         f"ለ{current_day} ተጨማሪ ምግብ ይጨምሩ? ወይም 'ቀጣይ ቀን' ወይም 'ጨርስ' ይጫኑ።",
-        reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup([['ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
     )
     return MEAL_SELECTION
 
@@ -1000,7 +973,7 @@ async def confirm_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
         for selection in selected_meals[day]:
             item = selection['item']
             meal_date = selection['meal_date'].strftime('%Y/%m/%d')
-            order_text += f"- {day} ({meal_date}): {item['name']}\n"
+            order_text += f"- {day} ({meal_date}): {item['name']} - {item['price']:.2f} ብር\n"
             total_price += item['price']
     order_text += f"\nጠቅላላ ዋጋ: {total_price:.2f} ብር\n"
     order_text += "ምርጫውን ያረጋግጡ?"
@@ -1037,26 +1010,25 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             context.user_data.clear()
             return MAIN_MENU
-        await update.message.reply_text(
+        fasting_items = [item for item in context.user_data.get('menu_items', []) if item['category'] == 'fasting']
+        non_fasting_items = [item for item in context.user_data.get('menu_items', []) if item['category'] == 'non_fasting']
+        menu_text = (
             f"📜 ለመረጡት ቀናት ምግቦች እንደገና ይምረጡ:\n"
             f"የተመረጡ ቀናት: {', '.join(selected_dates)}\n"
-            "የጾም ምግብ ዝርዝር\n"
-            "1. ምስር ወጥ …….. 160ብር\n"
-            "2. ጎመን …….. 160ብር\n"
-            "3. ሽሮ …….. 160ብር\n"
-            "4. ፓስታ …….. 160ብር\n"
-            "5. ፍርፍር …….. 160ብር\n"
-            "6. የጾም በሼፍ ውሳኔ …….. 160ብር\n"
-            "የፍስክ ምግብ ዝርዝር\n"
-            "7. ምስር በስጋ …….. 260ብር\n"
-            "8. ጎመን በስጋ …….. 260ብር\n"
-            "9. ቦዘና ሽሮ …….. 260ብር\n"
-            "10. ፓስታ በስጋ …….. 260ብር\n"
-            "11. ጥብስ/ቋንጣ ፍርፍር …….. 260ብር\n"
-            "12. የፍስክ በሼፍ ውሳኔ …….. 260ብር\n"
-            f"ለ{selected_dates[0]} የምግብ ቁጥር ያስገቡ (ለምሳሌ '1') ወይም 'ሼፍ'።\n"
-            "ለመሰረዝ 'ሰርዝ' ይፃፉ።",
-            reply_markup=ReplyKeyboardMarkup([['ሼፍ', 'ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
+            "የጾም ምግብ ዝርዝር:\n"
+        )
+        for idx, item in enumerate(fasting_items, 1):
+            menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n"
+        menu_text += "የፍስክ ምግብ ዝርዝር:\n"
+        for idx, item in enumerate(non_fasting_items, 1):
+            menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n"
+        menu_text += (
+            f"ለ{selected_dates[0]} የምግብ ቁጥል ያስገቡ (ለምሳሌ '1')።\n"
+            "ለመሰረዝ 'ሰርዝ' ይፃፉ።"
+        )
+        await update.message.reply_text(
+            menu_text,
+            reply_markup=ReplyKeyboardMarkup([['ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
         )
         return MEAL_SELECTION
     if user_input != '✅ የምግብ ዝርዝሩ ትክክል ነው':
@@ -1845,11 +1817,22 @@ async def view_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not locations:
             await update.message.reply_text("❌ የተዘጋጁ ቦታዎች የሉም።", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
-        text = "📍 የአስተዳዳሪ ቦታዎች:\n"
         for key, value in locations:
             admin_id = key.replace('admin_location_', '')
-            text += f"አስተዳዳሪ {admin_id}: {value}\n"
-        await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text(f"📍 አስተዳዳሪ {admin_id}: {value}")
+            if value.startswith('(') and ',' in value:
+                try:
+                    match = re.match(r'\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)', value)
+                    if match:
+                        lat = float(match.group(1))
+                        lon = float(match.group(2))
+                        await context.bot.send_location(chat_id=user.id, latitude=lat, longitude=lon)
+                except Exception as e:
+                    logger.error(f"Error sending location for admin {admin_id}: {e}")
+                    await update.message.reply_text(f"❌ ለአስተዳዳሪ {admin_id} ማፕ ማሳየት ላይ ስህተት።")
+            else:
+                await update.message.reply_text(f"ℹ️ ለአስተዳዳሪ {admin_id}: የማፕ ትውልድ የለም (ጽሑፍ ቦታ)።")
+        await update.message.reply_text("✅ የተጋሩ ቦታዎች ተመልክተዋል።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching locations: {e}")
