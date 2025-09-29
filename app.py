@@ -767,13 +767,10 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if isinstance(item, dict) and all(key in item for key in ['id', 'name', 'price', 'category'])
             ]
         else:
-            valid_items = [
-                item for item in default_menu 
-                if isinstance(item, dict) and all(key in item for key in ['id', 'name', 'price', 'category'])
-            ]
+            valid_items = []
         if not valid_items:
             await update.message.reply_text(
-                "❌ ለዚህ ሳምንት ተገቢ የምግብ ንጥሎች የሉም።",
+                "❌ ለዚህ ሳምንት ተገቢ የምግብ ንጥሎች የሉም። እባክዎ ድጋፍ ያነጋግሩ።",
                 reply_markup=get_main_keyboard(update.effective_user.id)
             )
             return MAIN_MENU
@@ -846,9 +843,15 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if valid_menu_items:
                 menu_items = valid_menu_items
             else:
-                menu_items = default_menu
+                menu_items = []
         else:
-            menu_items = default_menu
+            menu_items = []
+        if not menu_items:
+            await update.message.reply_text(
+                "❌ ለዚህ ሳምንት ምግብ ዝርዝር የለም። እባክዎ ድጋፍ ያነጋግሩ።",
+                reply_markup=get_main_keyboard(user.id)
+            )
+            return MAIN_MENU
         context.user_data['subscription_id'] = subscription_id
         context.user_data['menu_items'] = menu_items
         context.user_data['meals_remaining'] = meals_remaining
