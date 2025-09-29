@@ -315,7 +315,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Support handler
 async def support_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📞 የአስተዳዳሪውን ያግኙ፡ 0940406707",
+        "📞 አስተዳዳሪውን ያግኙ፡ 0940406707",
         reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
     )
     return SUPPORT_MENU
@@ -331,14 +331,14 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
     if user_data and user_data[0] and user_data[1]:
         await update.message.reply_text(
-            "🧾 ወደ ዋና ገጽ ተመለስተዋል።",
+            "🧾 ወደ መነሻ ገጽ ተመልሰዋል።",
             reply_markup=get_main_keyboard(user.id)
         )
         return MAIN_MENU
     else:
         keyboard = [['📋 ይመዝገቡ', '💬 ድጋፍ']]
         await update.message.reply_text(
-            "🧾 ወደ ዋና ገጽ ተመለስተዋል።",
+            "🧾 ወደ መነሻ ገጽ ተመልሰዋል።",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return MAIN_MENU
@@ -501,7 +501,7 @@ async def register_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user_point = Point(user_lng, user_lat)
                     if not DELIVERY_POLYGON.contains(user_point):
                         await update.message.reply_text(
-                            "❌ በእርስዎ ቦታ አገልግሎት አንሰጥም። እባክዎ በማስተናፈሻ አካባቢ ውስጥ ያለ ቦታ ያጋሩ።"
+                            "❌ በእርስዎ ቦታ አገልግሎት አንሰጥም።"
                         )
                         return REGISTER_LOCATION
             except Exception as e:
@@ -767,7 +767,7 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         if not valid_items:
             await update.message.reply_text(
-                "❌ ለዚህ ሳምንት ተገቢ የምግብ ንጥሎች የሉም።",
+                "❌ በዚህ ሳምንት የታቀዱ ምግቦች የሉም።",
                 reply_markup=get_main_keyboard(update.effective_user.id)
             )
             return MAIN_MENU
@@ -1115,7 +1115,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not subscription_id or total_price <= 0:
             logger.error(f"Missing or invalid subscription_id or total_price for user {user.id}")
             await update.message.reply_text(
-                "❌ ስህተት: ምዝገባ ወይም የክፍያ ውሂብ የለም። እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።",
+                "❌ ስህተት: የመመዝገቢያዎ ወይም የክፍያ መረጃዎ አይገኝም። እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።",
                 reply_markup=get_main_keyboard(user.id)
             )
             context.user_data.clear()
@@ -1191,7 +1191,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"Error notifying admin {admin_id} about new order: {e}")
         await update.message.reply_text(
-            "📤 የክፍያ ማረጋገጫ ተልኳል። ለአስተዳዳሪ አረጋግጥ ይጠብቃል።",
+            "📤 ክፍያዎ ተልኳል። ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።",
             reply_markup=get_main_keyboard(user.id)
         )
         context.user_data.clear()
@@ -1213,7 +1213,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -1280,7 +1280,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                     reply_markup=reply_markup
                 )
         await update.message.reply_text(
-            "📷 ከላይ ተጠባቂ የክፍያ ስምልጣዎች ናቸው። ንጣፎችን ተጠቀሙ ለአረጋግጥ ወይም ለውድቅ።",
+            "📷 ከላይ የቆዩ የክፍያ ጥያቄዎች ናቸው። ለማረጋገጥ ወይም ለመሰረዝ አማራጮቹን ይጠቀሙ።",
             reply_markup=get_main_keyboard(user.id)
         )
         return MAIN_MENU
@@ -1312,7 +1312,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         )
         payment = cur.fetchone()
         if not payment:
-            await query.message.reply_text("❌ ክፍያ አልተገኘም ወይም ቀደም ብሎ ተቀነባ ነው።")
+            await query.message.reply_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።")
             return
         user_id, subscription_id = payment
         if action == 'approve':
@@ -1329,7 +1329,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             # Send success message and help text
             await context.bot.send_message(
                 chat_id=user_id,
-                text="✅ የእርስዎ ክፍያ ተቀበለ! ምግቦችዎ ተደረጉ።"
+                text="✅ ክፍያዎ የተሳካ ነበር፣ እና ምግቦችዎ ዝግጁ ይሆናሉ"
             )
             fake_update = Update(0, message=type('obj', (object,), {'effective_user': type('obj', (object,), {'id': user_id})}))
             await send_help_text(fake_update, context)
@@ -1350,7 +1350,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             await query.message.reply_text("❌ ክፍያ ተውደቀ።")
             await context.bot.send_message(
                 chat_id=user_id,
-                text="❌ የእርስዎ ክፍያ ተውደቀ። እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።",
+                text="❌ ክፍያዎ ተሰርዟል። እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።",
                 reply_markup=get_main_keyboard(user_id)
             )
     except Exception as e:
@@ -1430,11 +1430,11 @@ async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         orders = cur.fetchall()
         if not orders:
             await update.message.reply_text(
-                "❌ ተደረጉ ምግቦች የሉም። ምግቦች ለመምረጥ /select_meals ይጠቀሙ።",
+                "❌ ምግቦች አልተዘጋጀም። ምግቦችን ለማምረጥ /select_meals ይጠቀሙ።።",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
-        text = "📅 የተደረጉ ምግቦችዎ:\n"
+        text = "📅 የተዘጋጁ ምግቦችዎ:\n"
         for meal_date, items_json in orders:
             items = json.loads(items_json) if isinstance(items_json, str) else items_json
             text += f"ቀን: {meal_date}\n"
@@ -1462,7 +1462,7 @@ async def help_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     await update.message.reply_text(
         "📋 አዲሱን ምግብ ዝርዝር በJSON ቅርጽ ያስገቡ (ለምሳሌ፣ [{'id': 1, 'name': 'Dish', 'price': 100, 'day': 'Monday', 'category': 'fasting'}])።",
@@ -1473,7 +1473,7 @@ async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         await update.message.reply_text("❌ የምግብ ዝርዝር ማዘመን ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
@@ -1508,7 +1508,7 @@ async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAUL
 async def admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -1533,7 +1533,7 @@ async def admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['menu_items'] = menu_items
         text = build_delete_menu_text(menu_items, week_start)
         await update.message.reply_text(
-            f"{text}\nለማስወገድ የንጥሉን ያስገቡ (ለምሳሌ '1') ወይም 'ሰርዝ'።",
+            f"{text}\nለማስወገድ ነጠላ ቁጥር ያስገቡ (ለምሳሌ: '1') ወይም 'ሰርዝ' ይጻፉ።",
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
         )
         return ADMIN_DELETE_MENU
@@ -1550,7 +1550,7 @@ async def admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         await update.message.reply_text("❌ የምግብ ዝርዝር ማስወገድ ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
@@ -1589,7 +1589,7 @@ async def process_admin_delete_menu(update: Update, context: ContextTypes.DEFAUL
 async def admin_subscribers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -1629,7 +1629,7 @@ async def admin_subscribers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -1670,7 +1670,7 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_daily_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -1723,7 +1723,7 @@ async def admin_daily_orders(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def admin_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     await update.message.reply_text(
         "📢 ለሁሉም ተጠቃሚዎች ለማስተላለፍ መልእክት ያስገቡ:",
@@ -1734,7 +1734,7 @@ async def admin_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_admin_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         await update.message.reply_text("❌ ማስታወቂያ ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
@@ -1771,10 +1771,10 @@ async def process_admin_announce(update: Update, context: ContextTypes.DEFAULT_T
 async def set_admin_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     await update.message.reply_text(
-        "📍 የካፌ ቦታ ያጋሩ ወይም 'ዝለል' በእጅ ለመጻፍ።",
+        "📍 የካፌ ቦታ ያጋሩ ወይም 'ዝለል'።",
         reply_markup=ReplyKeyboardMarkup(
             [[{"text": "📍 ቦታ አጋራ", "request_location": True}, "ዝለል", '🔙 ተመለስ']],
             resize_keyboard=True,
@@ -1786,7 +1786,7 @@ async def set_admin_location(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def process_set_admin_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text in ['🔙 ተመለስ', 'ዝለል']:
         await update.message.reply_text("❌ ቦታ ማዘጋጀት ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
@@ -1830,7 +1830,7 @@ async def process_set_admin_location(update: Update, context: ContextTypes.DEFAU
 async def view_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አብራሪ የለዎትም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
