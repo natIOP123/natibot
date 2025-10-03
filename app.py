@@ -60,9 +60,8 @@ default_menu = [
     MAIN_MENU, REGISTER_NAME, REGISTER_PHONE, REGISTER_LOCATION, CONFIRM_REGISTRATION,
     CHOOSE_PLAN, CHOOSE_DATE, MEAL_SELECTION, CONFIRM_MEAL, PAYMENT_UPLOAD,
     RESCHEDULE_MEAL, ADMIN_UPDATE_MENU, ADMIN_ANNOUNCE, ADMIN_DAILY_ORDERS,
-    ADMIN_DELETE_MENU, SET_ADMIN_LOCATION, ADMIN_APPROVE_PAYMENT, SUPPORT_MENU,
-    WAIT_LOCATION_APPROVAL
-) = range(19)
+    ADMIN_DELETE_MENU, SET_ADMIN_LOCATION, ADMIN_APPROVE_PAYMENT, SUPPORT_MENU
+) = range(18)
 
 # Database connection helper
 def get_db_connection():
@@ -539,8 +538,7 @@ async def register_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📤 ቦታዎ ተልኳል። ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።",
             reply_markup=get_main_keyboard(user.id)
         )
-        context.user_data['pending_location_id'] = pending_id
-        return WAIT_LOCATION_APPROVAL
+        return MAIN_MENU
     except Exception as e:
         logger.error(f"Error saving location for user {user.id}: {e}")
         await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።")
@@ -550,15 +548,6 @@ async def register_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             cur.close()
         if conn:
             conn.close()
-
-# Wait for location approval
-async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # This state can handle messages, but for now, just redirect to main
-    await update.message.reply_text(
-        "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። ወደ መነሻ ገጽ ተመልሱ።",
-        reply_markup=get_main_keyboard(update.effective_user.id)
-    )
-    return MAIN_MENU
 
 # Confirm registration
 async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1320,27 +1309,16 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
             )
             conn.commit()
             await query.message.reply_text("✅ ቦታ ተቀበለ።")
-            # Send confirmation to user and proceed to confirm registration
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute("SELECT full_name, phone_number FROM public.users WHERE telegram_id = %s", (user_id,))
-            user_data = cur.fetchone()
-            full_name = user_data[0] if user_data else 'የለም'
-            phone_number = user_data[1] if user_data else 'የለም'
-            cur.close()
-            conn.close()
-            registration_text = (
-                "ያስገቡት መረጃ:\n"
-                f"ሙሉ ስም: {full_name}\n"
-                f"ስልክ ቁጥር: {phone_number}\n"
-                f"የመላኪያ ቦታ: {location_text}\n"
-                "መረጃውን ያረጋግጡ። ትክክል ከሆነ 'መረጃው ትክክል ነው ቀጥል' ይምረጡ፣ ካልሆነ 'አስተካክል' ይምረጡ።"
-            )
-            keyboard = [['✅ መረጃው ትክክል ነው ቀጥል', '⛔ አስተካክል'], ['🔙 ተመለስ']]
+            # Send plan selection to user
             await context.bot.send_message(
                 chat_id=user_id,
-                text=f"✅ ቦታዎ ተቀበለ! አሁን መረጃዎን ያረጋግጡ:\n{registration_text}",
-                reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+                text="✅ ቦታዎ ተቀበለ! አሁን የምዝገባ እቅድዎን ይምረጡ:\n"
+                     "🍽️ የምሳ\n"
+                     "🥘 የእራት\n",
+                reply_markup=ReplyKeyboardMarkup(
+                    [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                    resize_keyboard=True
+                )
             )
         elif action == 'reject':
             cur.execute(
@@ -2091,6 +2069,7 @@ def main():
                 MAIN_MENU: [
                     MessageHandler(filters.Regex('^🍽 ምግብ ዝርዝር$'), show_menu),
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
+                    MessageHandler(filters.Regex('^(🍽️ የምሳ|🥘 የእራት)$'), choose_plan),
                     MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), my_subscription),  # ✅ Updated
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
                     MessageHandler(filters.Regex('^❓ እርዳታ አግኝ$'), help_button),  # ✅ Updated
@@ -2136,9 +2115,6 @@ def main():
                 ],
                 SET_ADMIN_LOCATION: [
                     MessageHandler(filters.LOCATION | (filters.TEXT & ~filters.COMMAND), process_set_admin_location)
-                ],
-                WAIT_LOCATION_APPROVAL: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, wait_location_approval)
                 ],
                 SUPPORT_MENU: [
                     MessageHandler(filters.Regex('^🔙 ተመለስ$'), back_to_main)
