@@ -39,10 +39,6 @@ DELIVERY_POLYGON = Polygon([(lon, lat) for lat, lon in ADMIN_LOCATIONS])
 # Time zone for East Africa Time (EAT, UTC+3)
 EAT = pytz.timezone('Africa/Nairobi')
 
-# Amharic day names
-valid_days_am = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
-valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-
 # Default menu fallback
 default_menu = [
     {'id': 1, 'name': 'ምስር ወጥ', 'price': 160.00, 'category': 'fasting'},
@@ -1330,28 +1326,6 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             )
             conn.commit()
             await query.message.reply_text("✅ ክፍያ ተቀበለ።")
-            # Fetch order details for announcement
-            cur.execute("SELECT amount FROM public.payments WHERE id = %s", (payment_id,))
-            total_price = cur.fetchone()[0]
-            cur.execute("SELECT meal_date, items FROM public.orders WHERE subscription_id = %s ORDER BY meal_date", (subscription_id,))
-            orders = cur.fetchall()
-            order_details = "✅ ክፍያዎ ተቀበሏል! የተዘጋጁ ምግቦችዎ:\n\n"
-            order_details += f"ጠቅላላ ዋጋ: {total_price:.2f} ብር\n\n"
-            order_details += "ትዕዛዞች:\n"
-            for meal_date, items_json in orders:
-                items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                meal_date_obj = datetime.date(meal_date.year, meal_date.month, meal_date.day)
-                weekday_idx = meal_date_obj.weekday()
-                day_am = valid_days_am[weekday_idx]
-                order_details += f"{day_am} ({meal_date.strftime('%Y-%m-%d')}):\n"
-                for item in items:
-                    order_details += f"- {item['name']} - {item['price']:.2f} ብር\n"
-                order_details += "\n"
-            # Send the detailed announcement to the user
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=order_details
-            )
             # Send success message and help text
             await context.bot.send_message(
                 chat_id=user_id,
