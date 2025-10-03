@@ -60,8 +60,9 @@ default_menu = [
     MAIN_MENU, REGISTER_NAME, REGISTER_PHONE, REGISTER_LOCATION, CONFIRM_REGISTRATION,
     CHOOSE_PLAN, CHOOSE_DATE, MEAL_SELECTION, CONFIRM_MEAL, PAYMENT_UPLOAD,
     RESCHEDULE_MEAL, ADMIN_UPDATE_MENU, ADMIN_ANNOUNCE, ADMIN_DAILY_ORDERS,
-    ADMIN_DELETE_MENU, SET_ADMIN_LOCATION, ADMIN_APPROVE_PAYMENT, SUPPORT_MENU
-) = range(18)
+    ADMIN_DELETE_MENU, SET_ADMIN_LOCATION, ADMIN_APPROVE_PAYMENT, SUPPORT_MENU,
+    WAIT_LOCATION_APPROVAL
+) = range(19)
 
 # Database connection helper
 def get_db_connection():
@@ -538,11 +539,59 @@ async def register_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📤 ቦታዎ ተልኳል። ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።",
             reply_markup=get_main_keyboard(user.id)
         )
-        return MAIN_MENU
+        context.user_data['pending_location_id'] = pending_id
+        return WAIT_LOCATION_APPROVAL
     except Exception as e:
         logger.error(f"Error saving location for user {user.id}: {e}")
         await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።")
         return REGISTER_LOCATION
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+# Wait for location approval
+async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT status FROM public.pending_locations WHERE user_id = %s ORDER BY created_at DESC LIMIT 1",
+            (user.id,)
+        )
+        pending = cur.fetchone()
+        if pending and pending[0] == 'approved':
+            choice = update.message.text
+            if choice in ['🍽️ የምሳ', '🥘 የእራት']:
+                return await choose_plan(update, context)
+            else:
+                await update.message.reply_text(
+                    "✅ ቦታዎ ተቀበለ! የምዝገባ እቅድዎን ይምረጡ:\n"
+                    "🍽️ የምሳ\n"
+                    "🥘 የእራት\n",
+                    reply_markup=ReplyKeyboardMarkup(
+                        [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                        resize_keyboard=True
+                    )
+                )
+                return CHOOSE_PLAN
+        else:
+            await update.message.reply_text(
+                "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። ወደ መነሻ ገጽ ተመልሱ።",
+                reply_markup=get_main_keyboard(user.id)
+            )
+            return MAIN_MENU
+    except Exception as e:
+        logger.error(f"Error in wait_location_approval for user {user.id}: {e}")
+        await update.message.reply_text(
+            "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። ወደ መነሻ ገጽ ተመልሱ።",
+            reply_markup=get_main_keyboard(user.id)
+        )
+        return MAIN_MENU
     finally:
         if cur:
             cur.close()
@@ -677,7 +726,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             cur = conn.cursor()
             plan = context.user_data.get('plan')
             expiry_date = datetime.now(EAT) + timedelta(days=plan['duration_days'])
-            selected_dates_en = [valid_days_en[valid_days.index(day)] for day in selected_dates]
+            selected_dates_en_list = [valid_days_en[valid_days.index(day)] for day in selected_dates]
             cur.execute("""
                 SELECT 1
                 FROM information_schema.columns
@@ -695,17 +744,59 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             cur.execute(
                 "INSERT INTO public.subscriptions (user_id, plan_type, meals_remaining, selected_dates, expiry_date, status) "
                 "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-                (user.id, plan['type'], len(selected_dates), json.dumps(selected_dates_en), expiry_date, 'pending')
+                (user.id, plan['type'], len(selected_dates), json.dumps(selected_dates_en_list), expiry_date, 'pending')
             )
             subscription_id = cur.fetchone()[0]
             conn.commit()
             context.user_data['subscription_id'] = subscription_id
-            await update.message.reply_text(
-                f"📝 {len(selected_dates)} ቀን መርጠዋል\n"
-                "አሁን፣ ምግቦችዎን ለመምረጥ /select_meals ይጠቀሙ።",
-                reply_markup=ReplyKeyboardMarkup([['🍴 ምግብ ምረጥ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
+            # Auto proceed to meal selection
+            # Fetch current menu
+            today = datetime.now(EAT).date()
+            week_start = today - timedelta(days=today.weekday())
+            cur.execute("SELECT menu_items FROM public.weekly_menus WHERE week_start_date = %s", (week_start,))
+            menu_result = cur.fetchone()
+            if menu_result and menu_result[0]:
+                menu_items_from_db = json.loads(menu_result[0]) if isinstance(menu_result[0], str) else menu_result[0]
+                valid_menu_items = [
+                    item for item in menu_items_from_db 
+                    if isinstance(item, dict) and all(key in item for key in ['id', 'name', 'price', 'category'])
+                ]
+                if valid_menu_items:
+                    menu_items = valid_menu_items
+                else:
+                    menu_items = default_menu
+            else:
+                menu_items = default_menu
+            context.user_data['menu_items'] = menu_items
+            context.user_data['meals_remaining'] = len(selected_dates)
+            context.user_data['selected_dates'] = selected_dates
+            context.user_data['selected_dates_en'] = selected_dates_en_list
+            context.user_data['week_start'] = week_start
+            context.user_data['selected_meals'] = {day: [] for day in selected_dates}
+            context.user_data['current_day_index'] = 0
+            first_day = selected_dates[0]
+            fasting_items = [item for item in menu_items if item['category'] == 'fasting']
+            non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
+            menu_text = (
+                f"📜 ለ{first_day} ምግብ ይምረጡ:\n"
+                f"የተመረጡ ቀናት: {', '.join(selected_dates)}\n"
+                f"ቀሪ ምግቦች: {len(selected_dates)}\n"
+                "የጾም ምግብ ዝርዝር:\n"
             )
-            return MAIN_MENU
+            for idx, item in enumerate(fasting_items, 1):
+                menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n"
+            menu_text += "የፍስክ ምግብ ዝርዝር:\n"
+            for idx, item in enumerate(non_fasting_items, 1):
+                menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n"
+            menu_text += (
+                f"📝 ለ{first_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n"
+                "ለመሰረዝ 'ሰርዝ' ይፃፉ።"
+            )
+            await update.message.reply_text(
+                menu_text,
+                reply_markup=ReplyKeyboardMarkup([['ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
+            )
+            return MEAL_SELECTION
         except Exception as e:
             logger.error(f"Error saving subscription for user {user.id}: {e}")
             await update.message.reply_text(
@@ -1309,10 +1400,10 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
             )
             conn.commit()
             await query.message.reply_text("✅ ቦታ ተቀበለ።")
-            # Send plan selection to user
+            # Send direct to subscription plan
             await context.bot.send_message(
                 chat_id=user_id,
-                text="✅ ቦታዎ ተቀበለ! አሁን የምዝገባ እቅድዎን ይምረጡ:\n"
+                text="✅ ቦታዎ ተቀበለ! የምዝገባ እቅድዎን ይምረጡ:\n"
                      "🍽️ የምሳ\n"
                      "🥘 የእራት\n",
                 reply_markup=ReplyKeyboardMarkup(
@@ -2069,7 +2160,6 @@ def main():
                 MAIN_MENU: [
                     MessageHandler(filters.Regex('^🍽 ምግብ ዝርዝር$'), show_menu),
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
-                    MessageHandler(filters.Regex('^(🍽️ የምሳ|🥘 የእራት)$'), choose_plan),
                     MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), my_subscription),  # ✅ Updated
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
                     MessageHandler(filters.Regex('^❓ እርዳታ አግኝ$'), help_button),  # ✅ Updated
@@ -2115,6 +2205,9 @@ def main():
                 ],
                 SET_ADMIN_LOCATION: [
                     MessageHandler(filters.LOCATION | (filters.TEXT & ~filters.COMMAND), process_set_admin_location)
+                ],
+                WAIT_LOCATION_APPROVAL: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, wait_location_approval)
                 ],
                 SUPPORT_MENU: [
                     MessageHandler(filters.Regex('^🔙 ተመለስ$'), back_to_main)
