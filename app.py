@@ -1556,13 +1556,14 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 (subscription_id,)
             )
             orders = cur.fetchall()
-            detailed_text = f"✅ ክፍያዎ {amount:.2f} ብር ተቀበለ!\n"
+            detailed_text = f"📢 የክፍያ ማረጋገጫ መልእክት!\n"
+            detailed_text += f"✅ ክፍያዎ {amount:.2f} ብር ተቀበለ!\n"
             detailed_text += "የተመረጡ ምግቦችና ቀናት:\n"
             for meal_date, items_json in orders:
                 items = json.loads(items_json) if isinstance(items_json, str) else items_json
                 detailed_text += f"{meal_date}: "
                 for item in items:
-                    detailed_text += f"{item['name']} "
+                    detailed_text += f"{item['name']} ({item['price']:.2f} ብር) "
                 detailed_text += "\n"
             detailed_text += f"ጠቅላላ መጠን: {amount:.2f} ብር\nምግቦችዎ ዝግጁ ይሆናሉ!"
             await context.bot.send_message(
