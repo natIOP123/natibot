@@ -61,8 +61,8 @@ default_menu = [
     CHOOSE_PLAN, CHOOSE_DATE, MEAL_SELECTION, CONFIRM_MEAL, PAYMENT_UPLOAD,
     RESCHEDULE_MEAL, ADMIN_UPDATE_MENU, ADMIN_ANNOUNCE, ADMIN_DAILY_ORDERS,
     ADMIN_DELETE_MENU, SET_ADMIN_LOCATION, ADMIN_APPROVE_PAYMENT, SUPPORT_MENU,
-    WAIT_LOCATION_APPROVAL
-) = range(19)
+    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION
+) = range(20)
 
 # Database connection helper
 def get_db_connection():
@@ -73,6 +73,25 @@ def get_db_connection():
     except Exception as e:
         logger.error(f"Failed to connect to database: {e}")
         raise
+
+# Helper to check if user has pending location
+def has_pending_location(user_id):
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM public.pending_locations WHERE user_id = %s AND status = 'pending'", (user_id,))
+        result = cur.fetchone()
+        return result is not None
+    except Exception as e:
+        logger.error(f"Error checking pending location for user {user_id}: {e}")
+        return False
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 # Initialize database
 def init_db():
@@ -264,7 +283,10 @@ def build_delete_menu_text(menu_items, week_start):
     return text
 
 def get_main_keyboard(user_id):
-    if user_id in ADMIN_IDS:
+    if has_pending_location(user_id):
+        # Restricted keyboard during location approval
+        keyboard = [['⏳ ማረጋገጫ በመጠበቅ ላይ', '💬 ድጋፍ']]
+    elif user_id in ADMIN_IDS:
         keyboard = [
             ['🔐 ምግብ ዝርዝር አዘምን', '🔐 ምግብ ዝርዝር ሰርዝ'],
             ['🔐 ተመዝጋቢዎችን ተመልከት', '🔐 ክፍያዎችን ተመልከት'],
@@ -390,6 +412,170 @@ async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     await update.message.reply_text(commands_text, reply_markup=get_main_keyboard(user.id))
 
+# User Profile Handler
+async def user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if has_pending_location(user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT full_name, phone_number, location FROM public.users WHERE telegram_id = %s", (user.id,))
+        user_data = cur.fetchone()
+        if not user_data or not all(user_data):
+            await update.message.reply_text("❌ መረጃዎ የለም። እባክዎ ይመዝገቡ።", reply_markup=get_main_keyboard(user.id))
+            return MAIN_MENU
+        full_name, phone_number, location = user_data
+        text = (
+            "🗂️ የእርስዎ መረጃ ዝርዝር\n"
+            f"👤 ስም: {full_name}\n"
+            f"📱 ስልክ ቁጥር: {phone_number}\n"
+            f"🏠 አድራሻ: {location}"
+        )
+        keyboard = [['🏠 ቦታ ቀይር', '🔙 ተመለስ']]
+        await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
+        return USER_CHANGE_LOCATION  # Wait for change or back
+    except Exception as e:
+        logger.error(f"Error fetching user profile for {user.id}: {e}")
+        await update.message.reply_text("❌ መረጃዎን መጫን ላይ ስህተት።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+# Change Location Handler
+async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if update.message.text == '🔙 ተመለስ':
+        await back_to_main(update, context)
+        return MAIN_MENU
+    if update.message.text == '🏠 ቦታ ቀይር':
+        await update.message.reply_text(
+            "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n"
+            "📍 **ለምሳሌ:**\n"
+            "“Bole Edna mall, Alemnesh Plaza, office number 102”\n"
+            "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]",
+            reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+        )
+        return USER_CHANGE_LOCATION
+    # Process the location input
+    location = update.message.text.strip()
+    if not location:
+        await update.message.reply_text(
+            "❌ ቦታ አልተስገበም። እባክዎ ቦታዎን በጽሑፍ ያስገቡ።",
+            reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+        )
+        return USER_CHANGE_LOCATION
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # Insert into pending_locations
+        cur.execute(
+            "INSERT INTO public.pending_locations (user_id, location_text) VALUES (%s, %s) RETURNING id",
+            (user.id, location)
+        )
+        pending_id = cur.fetchone()[0]
+        conn.commit()
+        # Notify admins
+        for admin_id in ADMIN_IDS:
+            try:
+                keyboard = [
+                    [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{pending_id}"),
+                     InlineKeyboardButton("ውድቅ", callback_data=f"reject_location_{pending_id}")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=f"🔔 አዲስ ቦታ ጥያቄ ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n{location}",
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Error notifying admin {admin_id} about location {pending_id}: {e}")
+        await update.message.reply_text(
+            "📤 ቦታዎ ተልኳል። ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።",
+            reply_markup=get_main_keyboard(user.id)
+        )
+        context.user_data['pending_location_id'] = pending_id
+        return WAIT_LOCATION_APPROVAL
+    except Exception as e:
+        logger.error(f"Error saving location for user {user.id}: {e}")
+        await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።")
+        return USER_CHANGE_LOCATION
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+# Updated My Meals Handler
+async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if has_pending_location(user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    if user.id in ADMIN_IDS:
+        await update.message.reply_text("❌ አስተዳዳሪዎች ምግብ ዝርዝር አያስፈልጋቸውም።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # Fetch subscription
+        cur.execute(
+            "SELECT plan_type, meals_remaining, selected_dates FROM public.subscriptions WHERE user_id = %s AND status = 'active'",
+            (user.id,)
+        )
+        subscription = cur.fetchone()
+        if not subscription:
+            await update.message.reply_text(
+                "❌ ንቁ ምዝገባ የለም። /subscribe ይጠቀሙ።",
+                reply_markup=get_main_keyboard(user.id)
+            )
+            return MAIN_MENU
+        plan_type, meals_remaining, selected_dates_json = subscription
+        selected_dates_en = json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json
+        valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        valid_days_am = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
+        selected_dates = [valid_days_am[valid_days_en.index(day)] for day in selected_dates_en]
+        # Fetch orders for total price and selected meals
+        cur.execute(
+            "SELECT meal_date, items FROM public.orders WHERE user_id = %s AND status = 'confirmed' ORDER BY meal_date",
+            (user.id,)
+        )
+        orders = cur.fetchall()
+        total_price = 0
+        meal_details = []
+        for meal_date, items_json in orders:
+            items = json.loads(items_json) if isinstance(items_json, str) else items_json
+            for item in items:
+                total_price += item['price']
+                meal_details.append(f"{meal_date}: {item['name']}")
+        text = (
+            f"🗓️ የተመዘገቡበት ቀን: {', '.join(selected_dates)}\n"
+            f"🍴 የተመረጡ ምግብ: {', '.join(meal_details) if meal_details else 'አልተመረጡም'}\n"
+            f"💰 ጠቅላላ ዋጋ: {total_price:.2f} ብር\n"
+            f"🍴 ቀሪ ምግቦች: {meals_remaining}"
+        )
+        await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    except Exception as e:
+        logger.error(f"Error fetching meals for user {user.id}: {e}")
+        await update.message.reply_text("❌ የምግብ ዝርዝር መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
 # Registration: Full name
 async def register_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -481,7 +667,10 @@ async def register_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return CONFIRM_REGISTRATION
         else:
             await update.message.reply_text(
-                "እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ (ለምሳሌ: 'በሪ 15 ቁጥር 123')።",
+                "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n"
+                "📍 **ለምሳሌ:**\n"
+                "“Bole Edna mall, Alemnesh Plaza, office number 102”\n"
+                "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]",
                 reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
             )
             return REGISTER_LOCATION
@@ -643,6 +832,9 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
 # Choose subscription plan
 async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if has_pending_location(user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
     if user.id in ADMIN_IDS:
         await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
@@ -689,6 +881,9 @@ async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Choose dates
 async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if has_pending_location(user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
     if user.id in ADMIN_IDS:
         await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
@@ -853,6 +1048,10 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Show weekly menu
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if has_pending_location(user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
     conn = None
     cur = None
     try:
@@ -904,6 +1103,9 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Select meals
 async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if has_pending_location(user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
     if user.id in ADMIN_IDS:
         await update.message.reply_text("❌ አስተዳዳሪዎች ምግብ ምርጫ አያስፈልጋቸውም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
@@ -994,6 +1196,9 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if has_pending_location(user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
     text = update.message.text.strip()
     menu_items = context.user_data.get('menu_items', [])
     selected_dates = context.user_data.get('selected_dates', [])
@@ -1020,7 +1225,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
     if text == 'ቀጣይ ቀን':
         if not context.user_data['selected_meals'][selected_dates[current_day_index]]:
             await update.message.reply_text(
-                "❌ ቢያንስ አንድ ምግብ ይምረጡ ለዚህ ቀን።",
+                "❌ ቢያንስ አንድ ምጉብ ይምረጡ ለዚህ ቀን።",
                 reply_markup=ReplyKeyboardMarkup([['ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
             )
             return MEAL_SELECTION
@@ -1123,6 +1328,9 @@ async def confirm_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
 
 async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if has_pending_location(user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
     user_input = update.message.text
     conn = None
     cur = None
@@ -1197,6 +1405,9 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if has_pending_location(user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
     if update.message.text and update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         await update.message.reply_text(
             "❌ ምዝገባ ተሰርዟል።",
@@ -1602,9 +1813,12 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         if conn:
             conn.close()
 
-# My Subscription → My Info
+# My Subscription → My Info (keep as subscription details)
 async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    if has_pending_location(user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
     if user.id in ADMIN_IDS:
         await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
@@ -1651,50 +1865,11 @@ async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
-# My Meals
-async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪዎች ምግብ ዝርዝር አያስፈልጋቸውም።", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    conn = None
-    cur = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT meal_date, items FROM public.orders WHERE user_id = %s AND status = 'confirmed' "
-            "ORDER BY meal_date",
-            (user.id,)
-        )
-        orders = cur.fetchall()
-        if not orders:
-            await update.message.reply_text(
-                "❌ ምግቦች አልተዘጋጀም። ምግቦችን ለማምረጥ /select_meals ይጠቀሙ።።",
-                reply_markup=get_main_keyboard(user.id)
-            )
-            return MAIN_MENU
-        text = "📅 የተዘጋጁ ምግቦችዎ:\n"
-        for meal_date, items_json in orders:
-            items = json.loads(items_json) if isinstance(items_json, str) else items_json
-            text += f"ቀን: {meal_date}\n"
-            for item in items:
-                text += f"- {item['name']} ({item['category']})\n"
-            text += "\n"
-        await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    except Exception as e:
-        logger.error(f"Error fetching meals for user {user.id}: {e}")
-        await update.message.reply_text("❌ የምግብ ዝርዝር መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
 # Help button handler
 async def help_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if has_pending_location(update.effective_user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(update.effective_user.id))
+        return MAIN_MENU
     await send_help_text(update, context)
     return MAIN_MENU
 
@@ -2161,7 +2336,7 @@ def main():
                 MAIN_MENU: [
                     MessageHandler(filters.Regex('^🍽 ምግብ ዝርዝር$'), show_menu),
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
-                    MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), my_subscription),  # ✅ Updated
+                    MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), user_profile),  # ✅ Updated to user_profile
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
                     MessageHandler(filters.Regex('^❓ እርዳታ አግኝ$'), help_button),  # ✅ Updated
                     MessageHandler(filters.Regex('^🍴 ምግብ ምረጥ$'), select_meals),
@@ -2177,6 +2352,7 @@ def main():
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን አረጋግጥ$'), admin_approve_locations),
                     MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
+                    MessageHandler(filters.Regex('^⏳ ማረጋገጫ በመጠበቅ ላይ$'), lambda u, c: MAIN_MENU),  # Restricted
                 ],
                 REGISTER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name)],
                 REGISTER_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_phone)],  # ✅ Manual only
@@ -2209,6 +2385,9 @@ def main():
                 ],
                 WAIT_LOCATION_APPROVAL: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, wait_location_approval)
+                ],
+                USER_CHANGE_LOCATION: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, change_location)
                 ],
                 SUPPORT_MENU: [
                     MessageHandler(filters.Regex('^🔙 ተመለስ$'), back_to_main)
