@@ -432,10 +432,10 @@ async def user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return MAIN_MENU
         full_name, phone_number, location = user_data
         text = (
-            "🗂️ የእርስዎ መረጃ ዝርዝር\n"
-            f"👤 ስም: {full_name}\n"
-            f"📱 ስልክ ቁጥር: {phone_number}\n"
-            f"🏠 አድራሻ: {location}"
+            "የእርሶ መረጃ ዝርዝር\n"
+            f"ስም: {full_name}\n"
+            f"ስልክ ቁጥር: {phone_number}\n"
+            f"አድራሻ: {location}"
         )
         keyboard = [['🏠 ቦታ ቀይር', '🔙 ተመለስ']]
         await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
@@ -1015,7 +1015,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         selected_dates = context.user_data.get('selected_dates', [])
         if choice in selected_dates:
             await update.message.reply_text(
-                f"❌ {choice} ቀድሞውኑ ታክሏል። እባክዎ ሌላ ቀን ይምረጡ ወይም 'ጨርስ' ይጫኑ።",
+                f"❌ {choice} ቀደም ብሎ ታክሏል። እባክዎ ሌላ ቀን ይምረጡ ወይም 'ጨርስ' ይጫኑ።",
                 reply_markup=ReplyKeyboardMarkup(
                     [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
                      ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
@@ -2330,7 +2330,7 @@ def main():
                 MAIN_MENU: [
                     MessageHandler(filters.Regex('^🍽 ምግብ ዝርዝር$'), show_menu),
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
-                    MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), my_subscription),
+                    MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), user_profile),
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
                     MessageHandler(filters.Regex('^📞 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር አዘምን$'), admin_update_menu),
