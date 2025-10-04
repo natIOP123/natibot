@@ -297,8 +297,8 @@ def get_main_keyboard(user_id):
     else:
         keyboard = [
             ['🍽 ምግብ ዝርዝር', '🛒 ምዝገባ'],
-            ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች'],  # ✅ Updated
-            ['❓ እርዳታ አግኝ']   # ✅ Updated
+            ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች'],
+            ['📞 ድጋፍ']
         ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -350,7 +350,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Support handler
 async def support_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📞 አስተዳዳሪውን ያግኙ፡ 0940406707",
+        "📞 አስተዳዳሪውን ያግኙ\n"
+        "መልክት ለመላክ: @oz_misaka\n"
+        "ለመደወል: 0928 39 7777",
         reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
     )
     return SUPPORT_MENU
@@ -1865,19 +1867,6 @@ async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
-# Help button handler
-async def help_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if has_pending_location(update.effective_user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(update.effective_user.id))
-        return MAIN_MENU
-    await update.message.reply_text(
-        "✨📞 አስተዳዳሪውን ያግኙ ✨\n"
-        "👉 መልክት ለመላክ: @oz_misaka\n"
-        "👉 ለመደወል: 0928 39 7777",
-        reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
-    )
-    return SUPPORT_MENU
-
 # Admin: Update Menu
 async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -2341,9 +2330,9 @@ def main():
                 MAIN_MENU: [
                     MessageHandler(filters.Regex('^🍽 ምግብ ዝርዝር$'), show_menu),
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
-                    MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), user_profile),  # ✅ Updated to user_profile
+                    MessageHandler(filters.Regex('^👤 የእኔ መ���ጃ$'), user_profile),  # ✅ Updated to user_profile
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
-                    MessageHandler(filters.Regex('^❓ እርዳታ አግኝ$'), help_button),  # ✅ Updated
+                    MessageHandler(filters.Regex('^📞 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር አዘምን$'), admin_update_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር ሰርዝ$'), admin_delete_menu),
                     MessageHandler(filters.Regex('^🔐 ተመዝጋቢዎችን ተመልከት$'), admin_subscribers),
