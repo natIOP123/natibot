@@ -277,9 +277,9 @@ def build_delete_menu_text(menu_items, week_start):
     valid_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     day_order = {day: idx for idx, day in enumerate(valid_days)}
     sorted_items = sorted(menu_items, key=lambda x: day_order.get(x['day'], len(valid_days)))
-    text = f"📋 የምግብ ዝርዝር ለሳምንቱ መጀመሪያ {week_start} (ለመሰረዝ የተወሰነ ንጥል ይምረጡ):\n"
+    text = f"📋 የምግብ ዝርዝር ለሳምንቱ መጀመሪያ {week_start} (ለመሰረዝ የተወሰነ ንጥል ይምረጡ):\n\n"
     for idx, item in enumerate(sorted_items, 1):
-        text += f"{idx}. {item['day']}: {item['name']} - {item['price']:.2f} ብር\n"
+        text += f"{idx}. {item['day']}: {item['name']} - {item['price']:.2f} ብር\n\n"
     return text
 
 def get_main_keyboard(user_id):
@@ -312,12 +312,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cur = conn.cursor()
         # Onboarding message in Amharic
         onboarding_text = (
-            "👋 እንኳን ወደ ኦዝ ኪችን የምግብ ምዝገባ በደና መጡ!\n"
-            "ትኩስ እና ጣፋጭ ምግቦችን በነጻ ለእርስዎ እናደርሳለን።\n\n"
-            "የአገልግሎቱ መግለጫዎች እና ሂደቶች:\n"
-            "1️⃣ የምዝገባ እቅድዎን እና ቀን ይምረጡ\n"
-            "2️⃣ የሚወዷቸውን ምግቦች ከምግብ ዝርዝር ውስጥ ይምረጡ (ወይንም ከፈለጉ በሼፍ ውሳኔ)\n"
-            "3️⃣ በየቀኑ የማስታወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።"
+            "👋 እንኳን ወደ ኦዝ ኪችን የምግብ ምዝገባ በደና መጡ!\n\n"
+            "🍽 ትኩስ እና ጣፋጭ ምግቦችን በነጻ ለእርስዎ እናደርሳለን።\n\n"
+            "📋 የአገልግሎቱ መግለጫዎች እና ሂደቶች:\n\n"
+            "1️⃣ የምዝገባ እቅድዎን እና ቀን ይምረጡ\n\n"
+            "2️⃣ የሚወዷቸውን ምግቦች ከምግብ ዝርዝር ውስጥ ይምረጡ (ወይንም ከፈለጉ በሼፍ ውሳኔ)\n\n"
+            "3️⃣ በየቀኑ የማስታወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።\n\n"
+            "🚀 ይጀምሩ!"
         )
         # Check if user is registered
         cur.execute("SELECT full_name, phone_number, location FROM public.users WHERE telegram_id = %s", (user.id,))
@@ -325,7 +326,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_data and user_data[0] and user_data[1] and user_data[2]:
             # Show full main menu
             await update.message.reply_text(
-                f"👋 እንኳን ተመልሰው መጡ {user.first_name}!\n{onboarding_text}",
+                f"👋 እንኳን ተመልሰው መጡ {user.first_name}!\n\n{onboarding_text}",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
@@ -339,7 +340,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return MAIN_MENU
     except Exception as e:
         logger.error(f"Error in start for user {user.id}: {e}")
-        await update.message.reply_text("❌ በመጀመር ላይ ስህተት ተከስቷል። እባክዎ እንደገና ይሞክሩ።")
+        await update.message.reply_text("❌ በመጀመር ላይ ስህተት ተከስቷል። እባክዎ እንደገና ይሞክሩ።\n\n🔄 እንደገና ይሞክሩ!")
         return MAIN_MENU
     finally:
         if cur:
@@ -350,9 +351,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Support handler
 async def support_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📞 አስተዳዳሪውን ያግኙ\n"
-        "መልክት ለመላክ: @oz_misaka\n"
-        "ለመደወል: 0928 39 7777",
+        "📞 አስተዳዳሪውን ያግኙ\n\n"
+        "💬 መልክት ለመላክ: @oz_misaka\n\n"
+        "📱 ለመደወል: 0928 39 7777\n\n"
+        "🚀 ድጋፍ በተቻለአችነት ይረዳሉ!",
         reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
     )
     return SUPPORT_MENU
@@ -368,14 +370,16 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
     if user_data and user_data[0] and user_data[1] and user_data[2]:
         await update.message.reply_text(
-            "🧾 ወደ መነሻ ገጽ ተመልሰዋል።",
+            "🧾 ወደ መነሻ ገጽ ተመልሰዋል።\n\n"
+            "🍽 ምርጫዎችዎን ይመልከቱ!",
             reply_markup=get_main_keyboard(user.id)
         )
         return MAIN_MENU
     else:
         keyboard = [['📋 ይመዝገቡ', '💬 ድጋፍ']]
         await update.message.reply_text(
-            "🧾 ወደ መነሻ ገጽ ተመልሰዋል።",
+            "🧾 ወደ መነሻ ገጽ ተመልሰዋል።\n\n"
+            "📋 ይመዝገቡ ወይም ድጋፍ ይጠቀሙ!",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return MAIN_MENU
@@ -384,32 +388,32 @@ async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     commands_text = (
-        "👋 እንኳን ወደ ኦዝ ኪችን የምግብ ምዝገባ በደና መጡ!\n"
-        "ትኩስ እና ጣፋጭ ምግቦችን በነጻ ለእርስዎ እናደርሳለን።\n"
-        "የአገልግሎቱ መግለጫዎች እና ሂደቶች?\n"
-        "1️⃣ የምዝገባ እቅድዎን እና ቀን ይምረጡ\n"
-        "2️⃣ የሚወዷቸውን ምግቦች ከምግብ ዝርዝር ውስጥ ይምረጡ (ወይንም ከፈለጉ በሼፍ ውሳኔ)\n"
+        "👋 እንኳን ወደ ኦዝ ኪችን የምግብ ምዝገባ በደና መጡ!\n\n"
+        "🍽 ትኩስ እና ጣፋጭ ምግቦችን በነጻ ለእርስዎ እናደርሳለን።\n\n"
+        "📋 የአገልግሎቱ መግለጫዎች እና ሂደቶች?\n\n"
+        "1️⃣ የምዝገባ እቅድዎን እና ቀን ይምረጡ\n\n"
+        "2️⃣ የሚወዷቸውን ምግቦች ከምግብ ዝርዝር ውስጥ ይምረጡ (ወይንም ከፈለጉ በሼፍ ውሳኔ)\n\n"
         "3️⃣ በየቀኑ የማስታወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።\n\n"
-        "📋 የሚገኙ ትዕዛዞች:\n"
-        "🍽 /menu - የሳምንቱን ምግብ ዝርዝር ይመልከቱ\n"
-        "🛒 /subscribe - የምዝገባ እቅድ ይምረጡ\n"
-        "👤 /my_subscription - የእርስዎ መረጃ ይመልከቱ\n"
-        "📅 /my_meals - የመረጧቸውን ምግቦች ይመልከቱ\n"
-        "❓ /help - ይህን የእገዛ መልእክት ይመልከቱ\n"
+        "🔧 📋 የሚገኙ ትዕዛዞች:\n\n"
+        "🍽 /menu - የሳምንቱን ምግብ ዝርዝር ይመልከቱ\n\n"
+        "🛒 /subscribe - የምዝገባ እቅድ ይምረጡ\n\n"
+        "👤 /my_subscription - የእርስዎ መረጃ ይመልከቱ\n\n"
+        "📅 /my_meals - የመረጧቸውን ምግቦች ይመልከቱ\n\n"
+        "❓ /help - ይህን የእገዛ መልእክት ይመልከቱ\n\n"
         "🍴 /select_meals - ምግቦችዎን ይምረጡ"
     )
     if user.id in ADMIN_IDS:
         commands_text += (
-            "\n🔐 የአስተዳዳሪ ትዕዛዞች:\n"
-            "/admin_update_menu - የሳምንቱን ምግብ ዝርዝር ያዘምኑ\n"
-            "/admin_delete_menu - የሳምንቱን ምግብ ዝርዝር ይሰርዙ\n"
-            "/admin_subscribers - ንቁ ተመዝጋቢዎችን ይመልከቱ\n"
-            "/admin_payments - ክፍያዎችን ይከታተሉ\n"
-            "/admin_approve_payment - ተጠባቂ ክፍያዎችን ያረጋግጡ ወይም ውድቅ ያድርጉ\n"
-            "/admin_daily_orders - የዕለት ትዕዛዝ ዝርዝር ይመልከቱ\n"
-            "/admin_announce - ማስታወቂያዎችን ይላኩ\n"
-            "/setadminlocation - የካፌ ቦታ ያዘጋጁ\n"
-            "/viewlocations - የተጋሩ ቦታዎችን ይመልከቱ\n"
+            "\n\n🔐 🔧 የአስተዳዳሪ ትዕዛዞች:\n\n"
+            "/admin_update_menu - የሳምንቱን ምግብ ዝርዝር ያዘምኑ\n\n"
+            "/admin_delete_menu - የሳምንቱን ምግብ ዝርዝር ይሰርዙ\n\n"
+            "/admin_subscribers - ንቁ ተመዝጋቢዎችን ይመልከቱ\n\n"
+            "/admin_payments - ክፍያዎችን ይከታተሉ\n\n"
+            "/admin_approve_payment - ተጠባቂ ክፍያዎችን ያረጋግጡ ወይም ውድቅ ያድርጉ\n\n"
+            "/admin_daily_orders - የዕለት ትዕዛዝ ዝርዝር ይመልከቱ\n\n"
+            "/admin_announce - ማስታወቂያዎችን ይላኩ\n\n"
+            "/setadminlocation - የካፌ ቦታ ያዘጋጁ\n\n"
+            "/viewlocations - የተጋሩ ቦታዎችን ይመልከቱ\n\n"
             "/admin_approve_locations - ተጠባቂ ቦታዎችን ያረጋግጡ"
         )
     await update.message.reply_text(commands_text, reply_markup=get_main_keyboard(user.id))
@@ -418,7 +422,7 @@ async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -428,21 +432,22 @@ async def user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cur.execute("SELECT full_name, phone_number, location FROM public.users WHERE telegram_id = %s", (user.id,))
         user_data = cur.fetchone()
         if not user_data or not all(user_data):
-            await update.message.reply_text("❌ መረጃዎ የለም። እባክዎ ይመዝገቡ።", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ መረጃዎ የለም። እባክዎ ይመዝገቡ።\n\n🛒 /subscribe ይጠቀሙ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
         full_name, phone_number, location = user_data
         text = (
-            "የእርሶ መረጃ ዝርዝር\n"
-            f"ስም: {full_name}\n"
-            f"ስልክ ቁጥር: {phone_number}\n"
-            f"አድራሻ: {location}"
+            "👤 የእርስዎ መረጃ ዝርዝር\n\n"
+            f"📝 ስም: {full_name}\n\n"
+            f"📱 ስልክ ቁጥር: {phone_number}\n\n"
+            f"📍 አድራሻ: {location}\n\n"
+            "🔧 ለመቀየር ምርጫዎችን ይመልከቱ!"
         )
         keyboard = [['🏠 ቦታ ቀይር', '🔙 ተመለስ']]
         await update.message.reply_text(text, reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True))
         return USER_CHANGE_LOCATION  # Wait for change or back
     except Exception as e:
         logger.error(f"Error fetching user profile for {user.id}: {e}")
-        await update.message.reply_text("❌ መረጃዎን መጫን ላይ ስህተት።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ መረጃዎን መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -458,10 +463,11 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return MAIN_MENU
     if update.message.text == '🏠 ቦታ ቀይር':
         await update.message.reply_text(
-            "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n"
-            "📍 **ለምሳሌ:**\n"
-            "“Bole Edna mall, Alemnesh Plaza, office number 102”\n"
-            "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]",
+            "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
+            "📍 **ለምሳሌ:**\n\n"
+            "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
+            "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
+            "🚀 ቦታዎን ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
         return USER_CHANGE_LOCATION
@@ -469,7 +475,8 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     location = update.message.text.strip()
     if not location:
         await update.message.reply_text(
-            "❌ ቦታ አልተስገበም። እባክዎ ቦታዎን በጽሑፍ ያስገቡ።",
+            "❌ ቦታ አልተስገበም። እባክዎ ቦታዎን በጽሑፍ ያስገቡ።\n\n"
+            "🔄 እባክዎ እንደገና ይሞክሩ!",
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
         return USER_CHANGE_LOCATION
@@ -495,20 +502,22 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await context.bot.send_message(
                     chat_id=admin_id,
-                    text=f"🔔 አዲስ ቦታ ጥያቄ ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n{location}",
+                    text=f"🔔 አዲስ ቦታ ጥያቄ ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                     reply_markup=reply_markup
                 )
             except Exception as e:
                 logger.error(f"Error notifying admin {admin_id} about location {pending_id}: {e}")
         await update.message.reply_text(
-            "📤 ቦታዎ ተልኳል። ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።",
+            "📤 ቦታዎ ተልኳል።\n\n"
+            "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
+            "🚀 በትክክል ይጠብቁ!",
             reply_markup=get_main_keyboard(user.id)
         )
         context.user_data['pending_location_id'] = pending_id
         return WAIT_LOCATION_APPROVAL
     except Exception as e:
         logger.error(f"Error saving location for user {user.id}: {e}")
-        await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።")
+        await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return USER_CHANGE_LOCATION
     finally:
         if cur:
@@ -520,10 +529,10 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if user.id in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪዎች ምግብ ዝርዝር አያስፈልጋቸውም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪዎች ምግብ ዝርዝር አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -538,7 +547,8 @@ async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         subscription = cur.fetchone()
         if not subscription:
             await update.message.reply_text(
-                "❌ ንቁ ምዝገባ የለም። /subscribe ይጠቀሙ።",
+                "❌ ንቁ ምዝገባ የለም።\n\n"
+                "🛒 /subscribe ይጠቀሙ!",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
@@ -561,16 +571,19 @@ async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 total_price += item['price']
                 meal_details.append(f"{meal_date}: {item['name']}")
         text = (
-            f"🗓️ የተመዘገቡበት ቀን: {', '.join(selected_dates)}\n"
-            f"🍴 የተመረጡ ምግብ: {', '.join(meal_details) if meal_details else 'አልተመረጡም'}\n"
-            f"💰 ጠቅላላ ዋጋ: {total_price:.2f} ብር\n"
-            f"🍴 ቀሪ ምግቦች: {meals_remaining}"
+            f"🗓️ የተመዘገቡበት ቀን:\n\n"
+            f"📅 {', '.join(selected_dates)}\n\n"
+            f"🍴 የተመረጡ ምግብ:\n\n"
+            f"{', '.join(meal_details) if meal_details else 'አልተመረጡም'}\n\n"
+            f"💰 ጠቅላላ ዋጋ: {total_price:.2f} ብር\n\n"
+            f"🍽 ቀሪ ምግቦች: {meals_remaining}\n\n"
+            "🔧 ለመምረጥ /select_meals ይጠቀሙ!"
         )
         await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching meals for user {user.id}: {e}")
-        await update.message.reply_text("❌ የምግብ ዝርዝር መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ የምግብ ዝርዝር መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -584,7 +597,8 @@ async def register_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == '🔙 ተመለስ':
         return await back_to_main(update, context)
     await update.message.reply_text(
-        "እባክዎ ሙሉ ስምዎን ያስገቡ።",
+        "📝 እባክዎ ሙሉ ስምዎን ያስገቡ።\n\n"
+        "🚀 ስምዎን ያስገቡ!",
         reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
     )
     return REGISTER_NAME
@@ -600,7 +614,7 @@ async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn = get_db_connection()
         cur = conn.cursor()
         if not await ensure_user_exists(user, conn, cur):
-            await update.message.reply_text("❌ ተጠቃሚ መመዝገብ ላይ ስህተት ተከስቷል። እባክዎ እንደገና ይሞክሩ።")
+            await update.message.reply_text("❌ ተጠቃሚ መመዝገብ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
             return MAIN_MENU
         cur.execute(
             "UPDATE public.users SET full_name = %s WHERE telegram_id = %s",
@@ -608,13 +622,14 @@ async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         conn.commit()
         await update.message.reply_text(
-            "እባክዎ ስልክ ቁጥርዎን ያስገቡ (ለምሳሌ: 0912345678)።",
+            "📱 እባክዎ ስልክ ቁጥርዎን ያስገቡ (ለምሳሌ: 0912345678)።\n\n"
+            "🚀 ስልክ ቁጥርዎን ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
         return REGISTER_PHONE
     except Exception as e:
         logger.error(f"Error saving name for user {user.id}: {e}")
-        await update.message.reply_text("❌ ስም በማስቀመጥ ላይ ስህተት ተከስቷል። እባክዎ እንደገና ይሞክሩ።")
+        await update.message.reply_text("❌ ስም በማስቀመጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return REGISTER_NAME
     finally:
         if cur:
@@ -631,7 +646,9 @@ async def register_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Basic phone validation (Ethiopian format)
     if not re.match(r'^09\d{8}$', phone_number):
         await update.message.reply_text(
-            "❌ የማይሰራ ስልክ ቁጥር። እባክዎ ትክክለኛ የኢትዮጵያ ቁጥር ያስገቡ (ለምሳሌ: 0912345678)።",
+            "❌ የማይሰራ ስልክ ቁጥር።\n\n"
+            "📱 እባክዎ ትክክለኛ የኢትዮጵያ ቁጥር ያስገቡ (ለምሳሌ: 0912345678)።\n\n"
+            "🔄 እንደገና ይሞክሩ!",
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
         return REGISTER_PHONE
@@ -655,11 +672,12 @@ async def register_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             conn.commit()
             registration_text = (
-                "ያስገቡት መረጃ:\n"
-                f"ሙሉ ስም: {context.user_data.get('full_name', 'የለም')}\n"
-                f"ስልክ ቁጥር: {context.user_data.get('phone_number', 'የለም')}\n"
-                f"የመላኪያ ቦታ: {context.user_data.get('location', 'የለም')}\n"
-                "መረጃውን ያረጋግጡ። ትክክል ከሆነ 'መረጃው ትክክል ነው ቀጥል' ይምረጡ፣ ካልሆነ 'አስተካክል' ይምረጡ።"
+                "📋 ያስገቡት መረጃ:\n\n"
+                f"📝 ሙሉ ስም: {context.user_data.get('full_name', 'የለም')}\n\n"
+                f"📱 ስልክ ቁጥር: {context.user_data.get('phone_number', 'የለም')}\n\n"
+                f"📍 የመላኪያ ቦታ: {context.user_data.get('location', 'የለም')}\n\n"
+                "✅ መረጃውን ያረጋግጡ።\n\n"
+                "🔄 ትክክል ከሆነ 'መረጃው ትክክል ነው ቀጥል' ይምረጡ፣ ካልሆነ 'አስተካክል' ይምረጡ።"
             )
             keyboard = [['✅ መረጃው ትክክል ነው ቀጥል', '⛔ አስተካክል'], ['🔙 ተመለስ']]
             await update.message.reply_text(
@@ -669,16 +687,17 @@ async def register_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return CONFIRM_REGISTRATION
         else:
             await update.message.reply_text(
-                "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n"
-                "📍 **ለምሳሌ:**\n"
-                "“Bole Edna mall, Alemnesh Plaza, office number 102”\n"
-                "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]",
+                "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
+                "📍 **ለምሳሌ:**\n\n"
+                "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
+                "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
+                "🚀 ቦታዎን ያስገቡ!",
                 reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
             )
             return REGISTER_LOCATION
     except Exception as e:
         logger.error(f"Error saving phone for user {user.id}: {e}")
-        await update.message.reply_text("❌ ስልክ ቁጥር በማስቀመጥ ላይ ስህተት ተከስቷል። እባክዎ እንደገና ይሞክሩ።")
+        await update.message.reply_text("❌ ስልክ ቁጥር በማስቀመጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return REGISTER_PHONE
     finally:
         if cur:
@@ -694,7 +713,9 @@ async def register_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     location = update.message.text.strip()
     if not location:
         await update.message.reply_text(
-            "❌ ቦታ አልተስገበም። እባክዎ ቦታዎን በጽሑፍ ያስገቡ።",
+            "❌ ቦታ አልተስገበም።\n\n"
+            "📝 እባክዎ ቦታዎን በጽሑፍ ያስገቡ።\n\n"
+            "🔄 እንደገና ይሞክሩ!",
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
         return REGISTER_LOCATION
@@ -721,20 +742,22 @@ async def register_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await context.bot.send_message(
                     chat_id=admin_id,
-                    text=f"🔔 አዲስ ቦታ ጥያቄ ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n{location}",
+                    text=f"🔔 አዲስ ቦታ ጥያቄ ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                     reply_markup=reply_markup
                 )
             except Exception as e:
                 logger.error(f"Error notifying admin {admin_id} about location {pending_id}: {e}")
         await update.message.reply_text(
-            "📤 ቦታዎ ተልኳል። ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።",
+            "📤 ቦታዎ ተልኳል።\n\n"
+            "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
+            "🚀 በትክክል ይጠብቁ!",
             reply_markup=get_main_keyboard(user.id)
         )
         context.user_data['pending_location_id'] = pending_id
         return WAIT_LOCATION_APPROVAL
     except Exception as e:
         logger.error(f"Error saving location for user {user.id}: {e}")
-        await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።")
+        await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return REGISTER_LOCATION
     finally:
         if cur:
@@ -761,9 +784,11 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                 return await choose_plan(update, context)
             else:
                 await update.message.reply_text(
-                    "✅ ቦታዎ ተቀበለ! የምዝገባ እቅድዎን ይምረጡ:\n"
-                    "🍽️ የምሳ\n"
-                    "🥘 የእራት\n",
+                    "✅ ቦታዎ ተቀበለ!\n\n"
+                    "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                    "🍽️ የምሳ\n\n"
+                    "🥘 የእራት\n\n"
+                    "🚀 እቅድ ይምረጡ!",
                     reply_markup=ReplyKeyboardMarkup(
                         [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
                         resize_keyboard=True
@@ -772,14 +797,18 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                 return CHOOSE_PLAN
         else:
             await update.message.reply_text(
-                "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። ወደ መነሻ ገጽ ተመልሱ።",
+                "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
+                "🏠 ወደ መነሻ ገጽ ተመልሱ።\n\n"
+                "🔄 እባክዎ ይጠብቁ!",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
     except Exception as e:
         logger.error(f"Error in wait_location_approval for user {user.id}: {e}")
         await update.message.reply_text(
-            "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። ወደ መነሻ ገጽ ተመልሱ።",
+            "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
+            "🏠 ወደ መነሻ ገጽ ተመልሱ።\n\n"
+            "🔄 እባክዎ ይጠብቁ!",
             reply_markup=get_main_keyboard(user.id)
         )
         return MAIN_MENU
@@ -798,22 +827,26 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
     elif choice == '⛔ አስተካክል':
         context.user_data.clear()
         await update.message.reply_text(
-            "እባክዎ ሙሉ ስምዎን ያስገቡ።",
+            "📝 እባክዎ ሙሉ ስምዎን ያስገቡ።\n\n"
+            "🚀 ስምዎን ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
         return REGISTER_NAME
     elif choice == '✅ መረጃው ትክክል ነው ቀጥል':
         if user.id in ADMIN_IDS:
             await update.message.reply_text(
-                "✅ ምዝገባ ተጠናቅቋል! እንደ አስተዳዳሪ ወደ ዋና ገጽ ተመለሱ።",
+                "✅ ምዝገባ ተጠናቅቋል!\n\n"
+                "🔐 እንደ አስተዳዳሪ ወደ ዋና ገጽ ተመለሱ።\n\n"
+                "🚀 አስተዳዳሪ ተመልከት!",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
         else:
             await update.message.reply_text(
-                "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
-                "🍽️ የምሳ\n"
-                "🥘 የእራት\n",
+                "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                "🍽️ የምሳ\n\n"
+                "🥘 የእራት\n\n"
+                "🚀 እቅድ ይምረጡ!",
                 reply_markup=ReplyKeyboardMarkup(
                     [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
                     resize_keyboard=True
@@ -822,7 +855,8 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
             return CHOOSE_PLAN
     else:
         await update.message.reply_text(
-            "❌ እባክዎ '✅ መረጃው ትክክል ነው ቀጥል' ወይም '⛔ አስተካክል' ይምረጡ።",
+            "❌ እባክዎ '✅ መረጃው ትክክል ነው ቀጥል' ወይም '⛔ አስተካክል' ይምረጡ።\n\n"
+            "🔄 ትክክለኛ ምርጫ ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(
                 [['✅ መረጃው ትክክል ነው ቀጥል', '⛔ አስተካክል'], ['🔙 ተመለስ']],
                 resize_keyboard=True,
@@ -835,17 +869,18 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
 async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if user.id in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     choice = update.message.text
     if choice == '/subscribe' or '🛒' in choice:
         await update.message.reply_text(
-            "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
-            "🍽️ የምሳ\n"
-            "🥘 የእራት\n",
+            "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+            "🍽️ የምሳ\n\n"
+            "🥘 የእራት\n\n"
+            "🚀 እቅድ ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(
                 [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
                 resize_keyboard=True
@@ -860,7 +895,9 @@ async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await back_to_main(update, context)
     if choice not in plans:
         await update.message.reply_text(
-            "❌ የማይሰራ ምርጫ። እባክዎ '🍽️ የምሳ' ወይም '🥘 የእራት' ይምረጡ።",
+            "❌ የማይሰራ ምርጫ።\n\n"
+            "📦 እባክዎ '🍽️ የምሳ' ወይም '🥘 የእራት' ይምረጡ።\n\n"
+            "🔄 ትክክለኛ ምርጫ ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(
                 [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
                 resize_keyboard=True
@@ -869,7 +906,8 @@ async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CHOOSE_PLAN
     context.user_data['plan'] = plans[choice]
     await update.message.reply_text(
-        "📅 ለምግቦችዎ ቀናት ይምረጡ (ከሰኞ እስከ እሑድ):",
+        "📅 ለምግቦችዎ ቀናት ይምረጡ (ከሰኞ እስከ እሑድ):\n\n"
+        "🔄 ቀናት ይምረጡ!",
         reply_markup=ReplyKeyboardMarkup(
             [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
              ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
@@ -884,19 +922,20 @@ async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if user.id in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     choice = update.message.text
     valid_days = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
     valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     if choice == '🔙 ተመለስ':
         await update.message.reply_text(
-            "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
-            "🍽️ የምሳ\n"
-            "🥘 የእራት\n",
+            "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+            "🍽️ የምሳ\n\n"
+            "🥘 የእራት\n\n"
+            "🚀 እቅድ ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(
                 [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
                 resize_keyboard=True
@@ -907,7 +946,9 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         selected_dates = context.user_data.get('selected_dates', [])
         if not selected_dates:
             await update.message.reply_text(
-                "❌ ቢያንስ አንድ ቀን ይምረጡ።",
+                "❌ ቢያንስ አንድ ቀን ይምረጡ።\n\n"
+                "📅 ቢያንስ አንድ ቀን ይምረጡ!\n\n"
+                "🔄 ቀናት ይምረጡ!",
                 reply_markup=ReplyKeyboardMarkup(
                     [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
                      ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
@@ -934,7 +975,9 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not cur.fetchone():
                 logger.error("selected_dates column missing in subscriptions table")
                 await update.message.reply_text(
-                    "❌ የዳታቤዝ ቅንብር ስህተት። እባክዎ ድጋፍ ያነጋግሩ ወይም ቆይተው እንደገና ይሞክሩ።",
+                    "❌ የዳታቤዝ ቅንብር ስህተት።\n\n"
+                    "💬 እባክዎ ድጋፍ ያነጋግሩ ወይም ቆይተው እንደገና ይሞክሩ።\n\n"
+                    "🔄 እንደገና ይሞክሩ!",
                     reply_markup=get_main_keyboard(user.id)
                 )
                 return MAIN_MENU
@@ -975,19 +1018,19 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             fasting_items = [item for item in menu_items if item['category'] == 'fasting']
             non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
             menu_text = (
-                f"📜 ለ{first_day} ምግብ ይምረጡ:\n"
-                f"የተመረጡ ቀናት: {', '.join(selected_dates)}\n"
-                f"ቀሪ ምግቦች: {len(selected_dates)}\n"
-                "የጾም ምግብ ዝርዝር:\n"
+                f"📜 ለ{first_day} ምግብ ይምረጡ:\n\n"
+                f"📅 የተመረጡ ቀናት: {', '.join(selected_dates)}\n\n"
+                f"🍽 ቀሪ ምግቦች: {len(selected_dates)}\n\n"
+                "🍲 የጾም ምግብ ዝርዝር:\n\n"
             )
             for idx, item in enumerate(fasting_items, 1):
-                menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n"
-            menu_text += "የፍስክ ምግብ ዝርዝር:\n"
+                menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n\n"
+            menu_text += "🍖 የፍስክ ምግብ ዝርዝር:\n\n"
             for idx, item in enumerate(non_fasting_items, 1):
-                menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n"
+                menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
             menu_text += (
-                f"📝 ለ{first_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n"
-                "ለመሰረዝ 'ሰርዝ' ይፃፉ።"
+                f"📝 ለ{first_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n\n"
+                "🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
             )
             await update.message.reply_text(
                 menu_text,
@@ -997,7 +1040,9 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"Error saving subscription for user {user.id}: {e}")
             await update.message.reply_text(
-                "❌ ምዝገባ በማስኬድ ላይ ስህተት። እባክዎ እንደገና ይሞክሩ ወይም ድጋፍ ያነጋግሩ።",
+                "❌ ምዝገባ በማስኬድ ላይ ስህተት።\n\n"
+                "💬 እባክዎ እንደገና ይሞክሩ ወይም ድጋፍ ያነጋግሩ።\n\n"
+                "🔄 እንደገና ይሞክሩ!",
                 reply_markup=ReplyKeyboardMarkup(
                     [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
                      ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
@@ -1015,7 +1060,9 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         selected_dates = context.user_data.get('selected_dates', [])
         if choice in selected_dates:
             await update.message.reply_text(
-                f"❌ {choice} ቀደም ብሎ ታክሏል። እባክዎ ሌላ ቀን ይምረጡ ወይም 'ጨርስ' ይጫኑ።",
+                f"❌ {choice} ቀደም ብሎ ታክሏል።\n\n"
+                "📅 እባክዎ ሌላ ቀን ይምረጡ ወይም 'ጨርስ' ይጫኑ።\n\n"
+                "🔄 ቀናት ይምረጡ!",
                 reply_markup=ReplyKeyboardMarkup(
                     [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
                      ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
@@ -1027,7 +1074,9 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         selected_dates.append(choice)
         context.user_data['selected_dates'] = selected_dates
         await update.message.reply_text(
-            f"✅ {choice} ታክሏል። ተጨማሪ ቀናት ይምረጡ ወይም 'ጨርስ' ይጫኑ።",
+            f"✅ {choice} ታክሏል።\n\n"
+            "📅 ተጨማሪ ቀናት ይምረጡ ወይም 'ጨርስ' ይጫኑ።\n\n"
+            "🚀 ቀናት ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(
                 [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
                  ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
@@ -1038,7 +1087,9 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return CHOOSE_DATE
     else:
         await update.message.reply_text(
-            "❌ የማይሰራ ምርጫ። እባክዎ ቀን ወይም 'ጨርስ' ይምረጡ።",
+            "❌ የማይሰራ ምርጫ።\n\n"
+            "📅 እባክዎ ቀን ወይም 'ጨርስ' ይምረጡ።\n\n"
+            "🔄 ትክክለኛ ምርጫ ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(
                 [['ሰኞ', 'ማክሰኞ', 'እሮብ'],
                  ['ሐሙስ', 'አርብ', 'ቅዳሜ'],
@@ -1052,7 +1103,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -1076,25 +1127,26 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         if not valid_items:
             await update.message.reply_text(
-                "❌ በዚህ ሳምንት የታቀዱ ምግቦች የሉም።",
+                "❌ በዚህ ሳምንት የታቀዱ ምግቦች የሉም።\n\n"
+                "🔄 እባክዎ እንደገና ይሞክሩ!",
                 reply_markup=get_main_keyboard(update.effective_user.id)
             )
             return MAIN_MENU
-        menu_text = f"📋 የምግብ ዝርዝር ለሳምንቱ መጀመሪያ {week_start}:\n"
-        menu_text += "የጾም ምግብ ዝርዝር\n"
+        menu_text = f"📋 የምግብ ዝርዝር ለሳምንቱ መጀመሪያ {week_start}:\n\n"
+        menu_text += "🍲 የጾም ምግብ ዝርዝር\n\n"
         fasting_items = [item for item in valid_items if item['category'] == 'fasting']
         for idx, item in enumerate(fasting_items, 1):
-            menu_text += f"{idx}. {item['name']} …….. {item['price']:.2f} ብር\n"
-        menu_text += "\nየፍስክ ምግብ ዝርዝር\n"
+            menu_text += f"{idx}. {item['name']} …….. {item['price']:.2f} ብር\n\n"
+        menu_text += "🍖 የፍስክ ምግብ ዝርዝር\n\n"
         non_fasting_items = [item for item in valid_items if item['category'] == 'non_fasting']
         for idx, item in enumerate(non_fasting_items, 1):
-            menu_text += f"{idx + len(fasting_items)}. {item['name']} …….. {item['price']:.2f} ብር\n"
-        menu_text += "\nምግቦችዎን ለመምረጥ /select_meals ይጠቀሙ።"
+            menu_text += f"{idx + len(fasting_items)}. {item['name']} …….. {item['price']:.2f} ብር\n\n"
+        menu_text += "🍴 ምግቦችዎን ለመምረጥ /select_meals ይጠቀሙ።\n\n🚀 ምግቦችን ይምረጡ!"
         await update.message.reply_text(menu_text, reply_markup=get_main_keyboard(update.effective_user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error in show_menu: {e}")
-        await update.message.reply_text("❌ ምግብ ዝርዝር መጫን ላይ ስህተት።", reply_markup=get_main_keyboard(update.effective_user.id))
+        await update.message.reply_text("❌ ምግብ ዝርዝር መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(update.effective_user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -1106,10 +1158,10 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if user.id in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪዎች ምግብ ምርጫ አያስፈልጋቸውም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪዎች ምግብ ምርጫ አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -1123,7 +1175,9 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         subscription = cur.fetchone()
         if not subscription:
             await update.message.reply_text(
-                "❌ ምግቦችን ለመምረጥ ምዝገባ ያስፈልጋል። /subscribe ይጠቀሙ።",
+                "❌ ምግቦችን ለመምረጥ ምዝገባ ያስፈልጋል።\n\n"
+                "🛒 /subscribe ይጠቀሙ።\n\n"
+                "🚀 ምዝገባ ይጀምሩ!",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
@@ -1131,7 +1185,9 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         selected_dates_en = json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json
         if meals_remaining <= 0 or not selected_dates_en:
             await update.message.reply_text(
-                "❌ በምዝገባዎ ውስጥ ምንም ቀሪ ምግቦች ወይም የተመረጡ ቀናት የሉም። እባክዎ አዲስ እቅድ ይመዝገቡ።",
+                "❌ በምዝገባዎ ውስጥ ምንም ቀሪ ምግቦች ወይም የተመረጡ ቀናት የሉም።\n\n"
+                "🛒 እባክዎ አዲስ እቅድ ይመዝገቡ።\n\n"
+                "🔄 እንደገና ይሞክሩ!",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
@@ -1167,19 +1223,19 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         fasting_items = [item for item in menu_items if item['category'] == 'fasting']
         non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
         menu_text = (
-            f"📜 ለ{first_day} ምግብ ይምረጡ:\n"
-            f"የተመረጡ ቀናት: {', '.join(selected_dates)}\n"
-            f"ቀሪ ምግቦች: {meals_remaining}\n"
-            "የጾም ምግብ ዝርዝር:\n"
+            f"📜 ለ{first_day} ምግብ ይምረጡ:\n\n"
+            f"📅 የተመረጡ ቀናት: {', '.join(selected_dates)}\n\n"
+            f"🍽 ቀሪ ምግቦች: {meals_remaining}\n\n"
+            "🍲 የጾም ምግብ ዝርዝር:\n\n"
         )
         for idx, item in enumerate(fasting_items, 1):
-            menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n"
-        menu_text += "የፍስክ ምግብ ዝርዝር:\n"
+            menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n\n"
+        menu_text += "🍖 የፍስክ ምግብ ዝርዝር:\n\n"
         for idx, item in enumerate(non_fasting_items, 1):
-            menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n"
+            menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
         menu_text += (
-            f"📝 ለ{first_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n"
-            "ለመሰረዝ 'ሰርዝ' ይፃፉ።"
+            f"📝 ለ{first_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n\n"
+            "🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
         )
         await update.message.reply_text(
             menu_text,
@@ -1188,7 +1244,7 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return MEAL_SELECTION
     except Exception as e:
         logger.error(f"Error starting meal selection for user {user.id}: {e}")
-        await update.message.reply_text("❌ ምግቦችን መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ ምግቦችን መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -1199,7 +1255,7 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     text = update.message.text.strip()
     menu_items = context.user_data.get('menu_items', [])
@@ -1210,14 +1266,17 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
     valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     if not all([menu_items, selected_dates, selected_dates_en, week_start]):
         await update.message.reply_text(
-            "❌ የክፍለ-ጊዜ ማብቂያ ወይም ምግብ ዝርዝር የለም። እባክዎ ከ /select_meals ጋር እንደገና ይጀምሩ።",
+            "❌ የክፍለ-ጊዜ ማብቂያ ወይም ምግብ ዝርዝር የለም።\n\n"
+            "🍴 እባክዎ ከ /select_meals ጋር እንደገና ይጀምሩ።\n\n"
+            "🔄 እንደገና ይጀምሩ!",
             reply_markup=get_main_keyboard(user.id)
         )
         context.user_data.clear()
         return MAIN_MENU
     if text == 'ሰርዝ':
         await update.message.reply_text(
-            "❌ የምግብ ምርጫ ተሰርዟል።",
+            "❌ የምግብ ምርጫ ተሰርዟል።\n\n"
+            "🔙 ወደ መነሻ ገጽ!",
             reply_markup=get_main_keyboard(user.id)
         )
         context.user_data.clear()
@@ -1227,7 +1286,9 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
     if text == 'ቀጣይ ቀን':
         if not context.user_data['selected_meals'][selected_dates[current_day_index]]:
             await update.message.reply_text(
-                "❌ ቢያንስ አንድ ምጉብ ይምረጡ ለዚህ ቀን።",
+                "❌ ቢያንስ አንድ ምጉብ ይምረጡ ለዚህ ቀን።\n\n"
+                "🍴 ቢያንስ አንድ ምግብ ይምረጡ!\n\n"
+                "🔄 ምግብ ይምረጡ!",
                 reply_markup=ReplyKeyboardMarkup([['ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
             )
             return MEAL_SELECTION
@@ -1238,18 +1299,18 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
         fasting_items = [item for item in menu_items if item['category'] == 'fasting']
         non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
         menu_text = (
-            f"📜 ለ{current_day} ምግብ ይምረጡ:\n"
-            "የጾም ምግብ ዝርዝር:\n"
+            f"📜 ለ{current_day} ምግብ ይምረጡ:\n\n"
+            "🍲 የጾም ምግብ ዝርዝር:\n\n"
         )
         for idx, item in enumerate(fasting_items, 1):
-            menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n"
-        menu_text += "የፍስክ ምግብ ዝርዝር:\n"
+            menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n\n"
+        menu_text += "🍖 የፍስክ ምግብ ዝርዝር:\n\n"
         for idx, item in enumerate(non_fasting_items, 1):
-            menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n"
+            menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
         menu_text += (
-            f"📝 ለ{current_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n"
-            "ለመሰረዝ 'ሰርዝ' ይፃፉ።\n"
-            "ተጨማሪ ምግብ ይጨምሩ ወይም 'ቀጣይ ቀን' ይጫኑ።"
+            f"📝 ለ{current_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n\n"
+            "🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።\n\n"
+            "➕ ተጨማሪ ምግብ ይጨምሩ ወይም 'ቀጣይ ቀን' ይጫኑ።"
         )
         await update.message.reply_text(
             menu_text,
@@ -1266,7 +1327,9 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
     except (IndexError, ValueError) as e:
         logger.error(f"Error accessing day data for user {user.id}: {e}")
         await update.message.reply_text(
-            "❌ የተመረጡ ቀናት ስህተት። እባክዎ ከ /select_meals ጋር እንደገና ይጀምሩ።",
+            "❌ የተመረጡ ቀናት ስህተት።\n\n"
+            "🍴 እባክዎ ከ /select_meals ጋር እንደገና ይጀምሩ።\n\n"
+            "🔄 እንደገና ይጀምሩ!",
             reply_markup=get_main_keyboard(user.id)
         )
         context.user_data.clear()
@@ -1285,22 +1348,29 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             })
             context.user_data['selected_meals'] = selected_meals
             await update.message.reply_text(
-                f"✅ ለ{current_day} {item['name']} ተመረጠ።"
+                f"✅ ለ{current_day} {item['name']} ተመረጠ።\n\n"
+                "🍴 ተመረጠ! ተጨማሪ ይጨምሩ?"
             )
         else:
             await update.message.reply_text(
-                f"❌ የማይሰራ የምግብ ቁጥር {text}። 1 እስከ {len(menu_items)} መካከል ይምረጡ።",
+                f"❌ የማይሰራ የምግብ ቁጥር {text}።\n\n"
+                f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጡ።\n\n"
+                "🔄 ትክክለኛ ቁጥር ያስገቡ!",
                 reply_markup=ReplyKeyboardMarkup([['ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
             )
             return MEAL_SELECTION
     except ValueError:
         await update.message.reply_text(
-            f"❌ የማይሰራ ግብዓት '{text}'። ንጥል ያስገቡ (ለምሳሌ '1')።",
+            f"❌ የማይሰራ ግብዓት '{text}'።\n\n"
+            "🔢 ንጥል ያስገቡ (ለምሳሌ '1')።\n\n"
+            "🔄 ትክክለኛ ንጥል ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
         )
         return MEAL_SELECTION
     await update.message.reply_text(
-        f"ለ{current_day} ተጨማሪ ምግብ ይጨምሩ? ወይም 'ቀጣይ ቀን' ወይም 'ጨርስ' ይጫኑ።",
+        f"🍴 ለ{current_day} ተጨማሪ ምግብ ይጨምሩ?\n\n"
+        "➕ ወይም 'ቀጣይ ቀን' ወይም 'ጨርስ' ይጫኑ።\n\n"
+        "🚀 ምርጫ ይምረጡ!",
         reply_markup=ReplyKeyboardMarkup([['ቀጣይ ቀን', 'ጨርስ', 'ሰርዝ'], ['🔙 ተመለስ']], resize_keyboard=True)
     )
     return MEAL_SELECTION
@@ -1308,16 +1378,16 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
 async def confirm_meal_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     selected_meals = context.user_data.get('selected_meals', {})
     total_price = 0
-    order_text = "የመረጡት ቀን እና ምግብ ዝርዝር\n"
+    order_text = "📋 የመረጡት ቀን እና ምግብ ዝርዝር\n\n"
     valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     for day in selected_meals:
         for selection in selected_meals[day]:
             item = selection['item']
             meal_date = selection['meal_date'].strftime('%Y/%m/%d')
-            order_text += f"- {day} ({meal_date}): {item['name']} - {item['price']:.2f} ብር\n"
+            order_text += f"- {day} ({meal_date}): {item['name']} - {item['price']:.2f} ብር\n\n"
             total_price += item['price']
-    order_text += f"\nጠቅላላ ዋጋ: {total_price:.2f} ብር\n"
-    order_text += "ምርጫውን ያረጋግጡ?"
+    order_text += f"💰 ጠቅላላ ዋጋ: {total_price:.2f} ብር\n\n"
+    order_text += "✅ ምርጫውን ያረጋግጡ?\n\n🚀 ያረጋግጡ!"
     context.user_data['total_price'] = total_price
     await update.message.reply_text(
         order_text,
@@ -1331,7 +1401,7 @@ async def confirm_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
 async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     user_input = update.message.text
     conn = None
@@ -1339,7 +1409,8 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_input == 'ሰርዝ' or user_input == '🔙 ተመለስ':
         context.user_data.clear()
         await update.message.reply_text(
-            "❌ የምግብ ምርጫ ተሰርዟል።",
+            "❌ የምግብ ምርጫ ተሰርዟል።\n\n"
+            "🔙 ወደ መነሻ ገጽ!",
             reply_markup=get_main_keyboard(user.id)
         )
         return MAIN_MENU
@@ -1349,7 +1420,9 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         selected_dates = context.user_data.get('selected_dates', [])
         if not selected_dates:
             await update.message.reply_text(
-                "❌ ምንም ቀናት አልተመረጡም። እባክዎ ከ /select_meals ጋር እንደገና ይጀምሩ።",
+                "❌ ምንም ቀናት አልተመረጡም።\n\n"
+                "🍴 እባክዎ ከ /select_meals ጋር እንደገና ይጀምሩ።\n\n"
+                "🔄 እንደገና ይጀምሩ!",
                 reply_markup=get_main_keyboard(user.id)
             )
             context.user_data.clear()
@@ -1358,18 +1431,18 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         fasting_items = [item for item in menu_items if item['category'] == 'fasting']
         non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
         menu_text = (
-            f"📜 ለመረጡት ቀናት ምግቦች እንደገና ይምረጡ:\n"
-            f"የተመረጡ ቀናት: {', '.join(selected_dates)}\n"
-            "የጾም ምግብ ዝርዝር:\n"
+            f"📜 ለመረጡት ቀናት ምግቦች እንደገና ይምረጡ:\n\n"
+            f"📅 የተመረጡ ቀናት: {', '.join(selected_dates)}\n\n"
+            "🍲 የጾም ምግብ ዝርዝር:\n\n"
         )
         for idx, item in enumerate(fasting_items, 1):
-            menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n"
-        menu_text += "የፍስክ ምግብ ዝርዝር:\n"
+            menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n\n"
+        menu_text += "🍖 የፍስክ ምግብ ዝርዝር:\n\n"
         for idx, item in enumerate(non_fasting_items, 1):
-            menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n"
+            menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
         menu_text += (
-            f"ለ{selected_dates[0]} የምግብ ቁጥል ያስገቡ (ለምሳሌ '1')።\n"
-            "ለመሰረዝ 'ሰርዝ' ይፃፉ።"
+            f"📝 ለ{selected_dates[0]} የምግብ ቁጥል ያስገቡ (ለምሳሌ '1')።\n\n"
+            "🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
         )
         await update.message.reply_text(
             menu_text,
@@ -1378,7 +1451,8 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return MEAL_SELECTION
     if user_input != '✅ የምግብ ዝርዝሩ ትክክል ነው':
         await update.message.reply_text(
-            "❌ እባክዎ '✅ የምግብ ዝርዝሩ ትክክል ነው' ወይም '⛔ አስተካክል' ይምረጡ።",
+            "❌ እባክዎ '✅ የምግብ ዝርዝሩ ትክክል ነው' ወይም '⛔ አስተካክል' ይምረጡ።\n\n"
+            "🔄 ትክክለኛ ምርጫ ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(
                 [['✅ የምግብ ዝርዝሩ ትክክል ነው', '⛔ አስተካክል'], ['ሰርዝ', '🔙 ተመለስ']],
                 resize_keyboard=True
@@ -1389,8 +1463,9 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_price = context.user_data.get('total_price', 0)
         if total_price <= 0:
             raise ValueError("Invalid total price")
-        order_text = f"📝 ጠቅላላ ዋጋ: {total_price:.2f} ብር\n"
-        order_text += "ክፍያ ማረጋገጫ ምስል ያስገቡ ለመቀጠል።"
+        order_text = f"💰 📝 ጠቅላላ ዋጋ: {total_price:.2f} ብር\n\n"
+        order_text += "💳 ክፍያ ማረጋገጫ ምስል ያስገቡ ለመቀጠል።\n\n"
+        order_text += "📤 ምስል ያስገቡ!"
         await update.message.reply_text(
             order_text,
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
@@ -1399,7 +1474,8 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error proceeding to payment for user {user.id}: {e}")
         await update.message.reply_text(
-            "❌ ወደ ክፍያ ማቋቋም ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።",
+            "❌ ወደ ክፍያ ማቋቋም ላይ ስህተት።\n\n"
+            "🔄 እባክዎ እንደገና ይሞክሩ።",
             reply_markup=get_main_keyboard(user.id)
         )
         context.user_data.clear()
@@ -1408,18 +1484,21 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text and update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         await update.message.reply_text(
-            "❌ ምዝገባ ተሰርዟል።",
+            "❌ ምዝገባ ተሰርዟል።\n\n"
+            "🔙 ወደ መነሻ ገጽ!",
             reply_markup=get_main_keyboard(user.id)
         )
         context.user_data.clear()
         return MAIN_MENU
     if not update.message.photo:
         await update.message.reply_text(
-            "❌ የክፍያ ማረጋገጫ ምስል ያስገቡ።",
+            "❌ የክፍያ ማረጋገጫ ምስል ያስገቡ።\n\n"
+            "📤 ምስል ያስገቡ!\n\n"
+            "🔄 እባክዎ ምስል ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
         )
         return PAYMENT_UPLOAD
@@ -1436,7 +1515,9 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not subscription_id or total_price <= 0:
             logger.error(f"Missing or invalid subscription_id or total_price for user {user.id}")
             await update.message.reply_text(
-                "❌ ስህተት: የመመዝገቢያዎ ወይም የክፍያ መረጃዎ አይገኝም። እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።",
+                "❌ ስህተት: የመመዝገቢያዎ ወይም የክፍያ መረጃዎ አይገኝም።\n\n"
+                "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n\n"
+                "🔄 እንደገና ይጀምሩ!",
                 reply_markup=get_main_keyboard(user.id)
             )
             context.user_data.clear()
@@ -1469,7 +1550,9 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.warning(f"Invalid receipt URL for payment {payment_id}: {receipt_url}")
                     await context.bot.send_message(
                         chat_id=admin_id,
-                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ {total_price:.2f} ብር። የማረጋገጫ URL የለም: {receipt_url}",
+                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ {total_price:.2f} ብር።\n\n"
+                             f"⚠️ የማረጋገጫ URL የለም: {receipt_url}\n\n"
+                             "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
                              InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
@@ -1480,7 +1563,9 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_photo(
                         chat_id=admin_id,
                         photo=receipt_url,
-                        caption=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ {total_price:.2f} ብር። እባክዎ ይፈትሹ።",
+                        caption=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ {total_price:.2f} ብር።\n\n"
+                                f"💳 እባክዎ ይፈትሹ።\n\n"
+                                "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
                              InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
@@ -1490,7 +1575,10 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.error(f"Error sending photo to admin {admin_id} for payment {payment_id}: {e}")
                     await context.bot.send_message(
                         chat_id=admin_id,
-                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ {total_price:.2f} ብር። የማረጋገጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})። የማረጋገጫ URL: {receipt_url}",
+                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ {total_price:.2f} ብር።\n\n"
+                             f"⚠️ የማረጋገጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
+                             f"🔗 የማረጋገጫ URL: {receipt_url}\n\n"
+                             "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
                              InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
@@ -1498,11 +1586,11 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
             except Exception as e:
                 logger.error(f"Error notifying admin {admin_id} for payment {payment_id}: {e}")
-        order_text = f"🔔 ከተጠቃሚ {user.id} አዲስ ትዕዛዝ:\n"
+        order_text = f"🔔 ከተጠቃሚ {user.id} አዲስ ትዕዛዝ:\n\n"
         for day in selected_meals:
             for selection in selected_meals[day]:
-                order_text += f"- {selection['meal_date'].strftime('%Y-%m-%d')}: {selection['item']['name']}\n"
-        order_text += f"ጠቅላላ: {total_price:.2f} ብር"
+                order_text += f"- {selection['meal_date'].strftime('%Y-%m-%d')}: {selection['item']['name']}\n\n"
+        order_text += f"💰 ጠቅላላ: {total_price:.2f} ብር\n\n🔧 ትዕዛዝ ተቀበለ!"
         for admin_id in ADMIN_IDS:
             try:
                 await context.bot.send_message(
@@ -1512,7 +1600,9 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"Error notifying admin {admin_id} about new order: {e}")
         await update.message.reply_text(
-            "📤 ክፍያዎ ተልኳል። ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።",
+            "📤 ክፍያዎ ተልኳል።\n\n"
+            "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
+            "🚀 በትክክል ይጠብቁ!",
             reply_markup=get_main_keyboard(user.id)
         )
         context.user_data.clear()
@@ -1520,7 +1610,8 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error processing payment for user {user.id}: {e}")
         await update.message.reply_text(
-            "❌ ማረጋገጫ በማስገባት ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።",
+            "❌ ማረጋገጫ በማስገባት ላይ ስህተት።\n\n"
+            "🔄 እባክዎ እንደገና ይሞክሩ።",
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
         )
         return PAYMENT_UPLOAD
@@ -1534,7 +1625,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -1549,7 +1640,8 @@ async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_
         locations = cur.fetchall()
         if not locations:
             await update.message.reply_text(
-                "📭 ለፍተሻ ተጠባቂ ቦታዎች የሉም።",
+                "📭 ለፍተሻ ተጠባቂ ቦታዎች የሉም።\n\n"
+                "🔙 ወደ መነሻ ገጽ!",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
@@ -1561,19 +1653,22 @@ async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.send_message(
                 chat_id=user.id,
-                text=f"ቦታ #{location_id}\n"
-                     f"ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n"
-                     f"ቦታ: {location_text}",
+                text=f"📍 ቦታ #{location_id}\n\n"
+                     f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
+                     f"📋 ቦታ: {location_text}\n\n"
+                     "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                 reply_markup=reply_markup
             )
         await update.message.reply_text(
-            "📍 ከላይ የቆዩ የቦታ ጥያቄዎች ናቸው። ለማረጋገጥ ወይም ለመሰረዝ አማራጮቹን ይጠቀሙ።",
+            "📍 ከላይ የቆዩ የቦታ ጥያቄዎች ናቸው።\n\n"
+            "🔧 ለማረጋገጥ ወይም ለመሰረዝ አማራጮቹን ይጠቀሙ።\n\n"
+            "🚀 እርምጃ ይወስዱ!",
             reply_markup=get_main_keyboard(user.id)
         )
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching pending locations: {e}")
-        await update.message.reply_text("❌ ተጠባቂ ቦታዎችን መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ ተጠባቂ ቦታዎችን መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -1599,7 +1694,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
         )
         location = cur.fetchone()
         if not location:
-            await query.message.reply_text("❌ ቦታ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።")
+            await query.message.reply_text("❌ ቦታ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
             return
         user_id, location_text = location
         if action == 'approve':
@@ -1612,13 +1707,15 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
                 (location_text, user_id)
             )
             conn.commit()
-            await query.message.reply_text("✅ ቦታ ተቀበለ።")
+            await query.message.reply_text("✅ ቦታ ተቀበለ።\n\n🚀 ተቀበለ!")
             # Send direct to subscription plan
             await context.bot.send_message(
                 chat_id=user_id,
-                text="✅ ቦታዎ ተቀበለ! የምዝገባ እቅድዎን ይምረጡ:\n"
-                     "🍽️ የምሳ\n"
-                     "🥘 የእራት\n",
+                text="✅ ቦታዎ ተቀበለ!\n\n"
+                     "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                     "🍽️ የምሳ\n\n"
+                     "🥘 የእራት\n\n"
+                     "🚀 እቅድ ይምረጡ!",
                 reply_markup=ReplyKeyboardMarkup(
                     [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
                     resize_keyboard=True
@@ -1630,15 +1727,17 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
                 (location_id,)
             )
             conn.commit()
-            await query.message.reply_text("❌ ቦታ ተውደቀ።")
+            await query.message.reply_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
             await context.bot.send_message(
                 chat_id=user_id,
-                text="❌ ቦታዎ ተሰርዟል። እባክዎ ከመጀመር ጋር እንደገና ይጀምሩ።",
+                text="❌ ቦታዎ ተሰርዟል።\n\n"
+                     "🔄 እባክዎ ከመጀመር ጋር እንደገና ይጀምሩ።\n\n"
+                     "🚀 /start ይጠቀሙ!",
                 reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
             )
     except Exception as e:
         logger.error(f"Error processing location callback for location {location_id}: {e}")
-        await query.message.reply_text("❌ የቦታ እርምጃ በማስተካከል ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።")
+        await query.message.reply_text("❌ የቦታ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
     finally:
         if cur:
             cur.close()
@@ -1649,7 +1748,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
 async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -1664,7 +1763,8 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
         payments = cur.fetchall()
         if not payments:
             await update.message.reply_text(
-                "📭 ለፍተሻ ተጠባቂ ክፍያዎች የሉም።",
+                "📭 ለፍተሻ ተጠባቂ ክፍያዎች የሉም።\n\n"
+                "🔙 ወደ መነሻ ገጽ!",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
@@ -1680,49 +1780,55 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                         await context.bot.send_photo(
                             chat_id=user.id,
                             photo=receipt_url,
-                            caption=f"ክፍያ #{payment_id}\n"
-                                    f"ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n"
-                                    f"መጠን: {amount:.2f} ብር",
+                            caption=f"💳 ክፍያ #{payment_id}\n\n"
+                                    f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
+                                    f"💰 መጠን: {amount:.2f} ብር\n\n"
+                                    "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                             reply_markup=reply_markup
                         )
                     except Exception as e:
                         logger.error(f"Error sending photo for payment {payment_id} to admin {user.id}: {e}")
                         await context.bot.send_message(
                             chat_id=user.id,
-                            text=f"ክፍያ #{payment_id}\n"
-                                 f"ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n"
-                                 f"መጠን: {amount:.2f} ብር\n"
-                                 f"የስምልጣ URL: {receipt_url}\n"
-                                 f"(ማሳወቂያ: ስቶ ማሳየት ስህተት ተከሰተ: {str(e)})",
+                            text=f"💳 ክፍያ #{payment_id}\n\n"
+                                 f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
+                                 f"💰 መጠን: {amount:.2f} ብር\n\n"
+                                 f"🔗 የስምልጣ URL: {receipt_url}\n\n"
+                                 f"(⚠️ ማሳወቂያ: ስቶ ማሳየት ስህተት ተከሰተ: {str(e)})\n\n"
+                                 "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                             reply_markup=reply_markup
                         )
                 else:
                     await context.bot.send_message(
                         chat_id=user.id,
-                        text=f"ክፍያ #{payment_id}\n"
-                             f"ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n"
-                             f"መጠን: {amount:.2f} ብር\n"
-                             f"የስምልጣ URL: {receipt_url or 'የለም'} (የማይሰራ ወይም የለም URL)",
+                        text=f"💳 ክፍያ #{payment_id}\n\n"
+                             f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
+                             f"💰 መጠን: {amount:.2f} ብር\n\n"
+                             f"🔗 የስምልጣ URL: {receipt_url or 'የለም'} (የማይሰራ ወይም የለም URL)\n\n"
+                             "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=reply_markup
                     )
             except Exception as e:
                 logger.error(f"Error processing payment {payment_id} for admin {user.id}: {e}")
                 await context.bot.send_message(
                     chat_id=user.id,
-                    text=f"ክፍያ #{payment_id}\n"
-                         f"ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n"
-                         f"መጠን: {amount:.2f} ብር\n"
-                         f"ስህተት: የክፍያ ዝርዝር ማስተካከል አልተሳካም",
+                    text=f"💳 ክፍያ #{payment_id}\n\n"
+                         f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
+                         f"💰 መጠን: {amount:.2f} ብር\n\n"
+                         f"⚠️ ስህተት: የክፍያ ዝርዝር ማስተካከል አልተሳካም\n\n"
+                         "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                     reply_markup=reply_markup
                 )
         await update.message.reply_text(
-            "📷 ከላይ የቆዩ የክፍያ ጥያቄዎች ናቸው። ለማረጋገጥ ወይም ለመሰረዝ አማራጮቹን ይጠቀሙ።",
+            "💳 📷 ከላይ የቆዩ የክፍያ ጥያቄዎች ናቸው።\n\n"
+            "🔧 ለማረጋገጥ ወይም ለመሰረዝ አማራጮቹን ይጠቀሙ።\n\n"
+            "🚀 እርምጃ ይወስዱ!",
             reply_markup=get_main_keyboard(user.id)
         )
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching pending payments: {e}")
-        await update.message.reply_text("❌ ተጠባቂ ክፍያዎችን መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ ተጠባቂ ክፍያዎችን መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -1749,7 +1855,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         )
         payment = cur.fetchone()
         if not payment:
-            await query.message.reply_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።")
+            await query.message.reply_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
             return
         user_id, subscription_id, amount = payment
         if action == 'approve':
@@ -1762,23 +1868,24 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 (subscription_id,)
             )
             conn.commit()
-            await query.message.reply_text("✅ ክፍያ ተቀበለ።")
+            await query.message.reply_text("✅ ክፍያ ተቀበለ።\n\n🚀 ተቀበለ!")
             # Fetch orders for detailed message
             cur.execute(
                 "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
                 (subscription_id,)
             )
             orders = cur.fetchall()
-            detailed_text = f"📢 የክፍያ ማረጋገጫ መልእክት!\n"
-            detailed_text += f"✅ ክፍያዎ {amount:.2f} ብር ተቀበለ!\n"
-            detailed_text += "የተመረጡ ምግቦችና ቀናት:\n"
+            detailed_text = f"📢 የክፍያ ማረጋገጫ መልእክት!\n\n"
+            detailed_text += f"✅ ክፍያዎ {amount:.2f} ብር ተቀበለ!\n\n"
+            detailed_text += "🍽 የተመረጡ ምግቦችና ቀናት:\n\n"
             for meal_date, items_json in orders:
                 items = json.loads(items_json) if isinstance(items_json, str) else items_json
                 detailed_text += f"{meal_date}: "
                 for item in items:
                     detailed_text += f"{item['name']} ({item['price']:.2f} ብር) "
-                detailed_text += "\n"
-            detailed_text += f"ጠቅላላ መጠን: {amount:.2f} ብር\nምግቦችዎ ዝግጁ ይሆናሉ!"
+                detailed_text += "\n\n"
+            detailed_text += f"💰 ጠቅላላ መጠን: {amount:.2f} ብር\n\n"
+            detailed_text += "🍴 ምግቦችዎ ዝግጁ ይሆናሉ!\n\n🚀 ተጠናቅቀው በደህና!"
             await context.bot.send_message(
                 chat_id=user_id,
                 text=detailed_text
@@ -1800,15 +1907,17 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 (subscription_id,)
             )
             conn.commit()
-            await query.message.reply_text("❌ ክፍያ ተውደቀ።")
+            await query.message.reply_text("❌ ክፍያ ተውደቀ።\n\n🚫 ተውደቀ!")
             await context.bot.send_message(
                 chat_id=user_id,
-                text="❌ ክፍያዎ ተሰርዟል። እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።",
+                text="❌ ክፍያዎ ተሰርዟል።\n\n"
+                     "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n\n"
+                     "🔄 እንደገና ይጀምሩ!",
                 reply_markup=get_main_keyboard(user_id)
             )
     except Exception as e:
         logger.error(f"Error processing payment callback for payment {payment_id}: {e}")
-        await query.message.reply_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።")
+        await query.message.reply_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
     finally:
         if cur:
             cur.close()
@@ -1819,10 +1928,10 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
 async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if user.id in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -1837,7 +1946,9 @@ async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
         subscription = cur.fetchone()
         if not subscription:
             await update.message.reply_text(
-                "❌ ንቁ ወይም ተጠባቂ ምዝገባዎች የሉም። /subscribe ይጠቀሙ አንድ ያጀምሩ።",
+                "❌ ንቁ ወይም ተጠባቂ ምዝገባዎች የሉም።\n\n"
+                "🛒 /subscribe ይጠቀሙ አንድ ያጀምሩ።\n\n"
+                "🚀 ምዝገባ ይጀምሩ!",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
@@ -1847,19 +1958,20 @@ async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
         valid_days_am = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
         selected_dates = [valid_days_am[valid_days_en.index(day)] for day in selected_dates_en]
         text = (
-            f"📋 የእርስዎ ምዝገባ:\n"
-            f"እቅድ: {plan_type.capitalize()}\n"
-            f"ቀሪ ምግቦች: {meals_remaining}\n"
-            f"የተመረጡ ቀናት: {', '.join(selected_dates)}\n"
-            f"የጊዜ ጫና: {expiry_date.strftime('%Y-%m-%d')}\n"
-            f"ሁኔታ: {status.capitalize()}\n"
-            "ምግቦችዎን ለመምረጥ /select_meals ይጠቀሙ።"
+            f"📋 የእርስዎ ምዝገባ:\n\n"
+            f"📦 እቅድ: {plan_type.capitalize()}\n\n"
+            f"🍽 ቀሪ ምግቦች: {meals_remaining}\n\n"
+            f"📅 የተመረጡ ቀናት: {', '.join(selected_dates)}\n\n"
+            f"⏰ የጊዜ ጫና: {expiry_date.strftime('%Y-%m-%d')}\n\n"
+            f"✅ ሁኔታ: {status.capitalize()}\n\n"
+            "🍴 ምግቦችዎን ለመምረጥ /select_meals ይጠቀሙ።\n\n"
+            "🚀 ምግቦችን ይምረጡ!"
         )
         await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching subscription for user {user.id}: {e}")
-        await update.message.reply_text("❌ የምዝገባ ዝርዝር መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ የምዝገባ ዝርዝር መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -1871,10 +1983,12 @@ async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     await update.message.reply_text(
-        "📋 አዲሱን ምግብ ዝርዝር በJSON ቅርጽ ያስገቡ (ለምሳሌ፣ [{'id': 1, 'name': 'Dish', 'price': 100, 'day': 'Monday', 'category': 'fasting'}])።",
+        "📋 አዲሱን ምግብ ዝርዝር በJSON ቅርጽ ያስገቡ (ለምሳሌ፣ [{'id': 1, 'name': 'Dish', 'price': 100, 'day': 'Monday', 'category': 'fasting'}])።\n\n"
+        "🔧 JSON ቅርጽ ያስገቡ!\n\n"
+        "🚀 ዝርዝር ያዘምኑ!",
         reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
     )
     return ADMIN_UPDATE_MENU
@@ -1882,10 +1996,10 @@ async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
-        await update.message.reply_text("❌ የምግብ ዝርዝር ማዘመን ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ የምግብ ዝርዝር ማዘመን ተሰርዟል።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     try:
         menu_data = json.loads(update.message.text)
@@ -1901,11 +2015,11 @@ async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAUL
             (week_start, json.dumps(menu_data))
         )
         conn.commit()
-        await update.message.reply_text("✅ ምግብ ዝርዝር በተሳካ ሁኔታ ተዘመነ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("✅ ምግብ ዝርዝር በተሳካ ሁኔታ ተዘመነ።\n\n🚀 ተዘመነ!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error updating menu: {e}")
-        await update.message.reply_text("❌ የማይሰራ JSON ወይም ምግብ ዝርዝር ማዘመን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ የማይሰራ JSON ወይም ምግብ ዝርዝር ማዘመን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
         return ADMIN_UPDATE_MENU
     finally:
         if 'cur' in locals():
@@ -1917,7 +2031,7 @@ async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAUL
 async def admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -1932,23 +2046,25 @@ async def admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         menu = cur.fetchone()
         if not menu:
-            await update.message.reply_text("❌ ለዚህ ሳምንት ምግብ ዝርዝር አልተገኘም።", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ ለዚህ ሳምንት ምግብ ዝርዝር አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
         menu_items = json.loads(menu[0]) if isinstance(menu[0], str) else menu[0]
         if not menu_items:
-            await update.message.reply_text("❌ ምግብ ዝርዝሩ ባዶ ነው።", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ ምግብ ዝርዝሩ ባዶ ነው።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
         context.user_data['week_start'] = week_start
         context.user_data['menu_items'] = menu_items
         text = build_delete_menu_text(menu_items, week_start)
         await update.message.reply_text(
-            f"{text}\nለማስወገድ ነጠላ ቁጥር ያስገቡ (ለምሳሌ: '1') ወይም 'ሰርዝ' ይጻፉ።",
+            f"{text}\n\n"
+            "🔢 ለማስወገድ ነጠላ ቁጥር ያስገቡ (ለምሳሌ: '1') ወይም 'ሰርዝ' ይጻፉ።\n\n"
+            "🚀 ንጥል ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
         )
         return ADMIN_DELETE_MENU
     except Exception as e:
         logger.error(f"Error fetching menu for deletion: {e}")
-        await update.message.reply_text("❌ ምግብ ዝርዝር መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ ምግብ ዝርዝር መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -1959,10 +2075,10 @@ async def admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
-        await update.message.reply_text("❌ የምግብ ዝርዝር ማስወገድ ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ የምግብ ዝርዝር ማስወገድ ተሰርዟል።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     try:
         item_idx = int(update.message.text) - 1
@@ -1970,7 +2086,9 @@ async def process_admin_delete_menu(update: Update, context: ContextTypes.DEFAUL
         week_start = context.user_data.get('week_start')
         if not (0 <= item_idx < len(menu_items)):
             await update.message.reply_text(
-                f"❌ የማይሰራ የንጥል ቁጥር። 1 እስከ {len(menu_items)} መካከል ይምረጡ።",
+                f"❌ የማይሰራ የንጥል ቁጥር።\n\n"
+                f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጡ።\n\n"
+                "🔄 ትክክለኛ ቁጥር ያስገቡ!",
                 reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
             )
             return ADMIN_DELETE_MENU
@@ -1982,11 +2100,11 @@ async def process_admin_delete_menu(update: Update, context: ContextTypes.DEFAUL
             (json.dumps(menu_items), week_start)
         )
         conn.commit()
-        await update.message.reply_text("✅ የምግብ ዝርዝር ንጥል በተሳካ ሁኔታ ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("✅ የምግብ ዝርዝር ንጥል በተሳካ ሁኔታ ተሰርዟል።\n\n🚀 ተሰርዟል!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error deleting menu item: {e}")
-        await update.message.reply_text("❌ የምግብ ዝርዝር ንጥል በማስወገድ ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ የምግብ ዝርዝር ንጥል በማስወገድ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
         return ADMIN_DELETE_MENU
     finally:
         if 'cur' in locals():
@@ -1998,7 +2116,7 @@ async def process_admin_delete_menu(update: Update, context: ContextTypes.DEFAUL
 async def admin_subscribers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -2012,21 +2130,22 @@ async def admin_subscribers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         subscribers = cur.fetchall()
         if not subscribers:
-            await update.message.reply_text("❌ ንቁ ወይም ተጠባቂ ተመዝጋቢዎች አልተገኙም።", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ ንቁ ወይም ተጠባቂ ተመዝጋቢዎች አልተገኙም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
-        text = "📋 ንቁ/ተጠባቂ ተመዝጋቢዎች:\n"
+        text = "📋 ንቁ/ተጠባቂ ተመዝጋቢዎች:\n\n"
         for full_name, username, plan_type, meals_remaining, expiry_date in subscribers:
             text += (
-                f"ስም: {full_name or 'የለም'} (@{username or 'የለም'})\n"
-                f"እቅድ: {plan_type.capitalize()}\n"
-                f"ቀሪ ምግቦች: {meals_remaining}\n"
-                f"ጫና: {expiry_date.strftime('%Y-%m-%d')}\n"
+                f"👤 ስም: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
+                f"📦 እቅድ: {plan_type.capitalize()}\n\n"
+                f"🍽 ቀሪ ምግቦች: {meals_remaining}\n\n"
+                f"⏰ ጫና: {expiry_date.strftime('%Y-%m-%d')}\n\n"
+                "────────────\n\n"
             )
         await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching subscribers: {e}")
-        await update.message.reply_text("❌ ተመዝጋቢዎችን መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ ተመዝጋቢዎችን መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -2038,7 +2157,7 @@ async def admin_subscribers(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -2052,22 +2171,23 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         payments = cur.fetchall()
         if not payments:
-            await update.message.reply_text("❌ ክፍያዎች አልተገኙም።", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ ክፍያዎች አልተገኙም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
-        text = "💸 የክፍያ ታሪክ:\n"
+        text = "💸 የክፍያ ታሪክ:\n\n"
         for payment_id, full_name, username, amount, status, created_at in payments:
             text += (
-                f"ክፍያ #{payment_id}\n"
-                f"ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n"
-                f"መጠን: {amount:.2f} ብር\n"
-                f"ሁኔታ: {status.capitalize()}\n"
-                f"ቀን: {created_at.strftime('%Y-%m-%d %H:%M')}\n"
+                f"💳 ክፍያ #{payment_id}\n\n"
+                f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
+                f"💰 መጠን: {amount:.2f} ብር\n\n"
+                f"✅ ሁኔታ: {status.capitalize()}\n\n"
+                f"📅 ቀን: {created_at.strftime('%Y-%m-%d %H:%M')}\n\n"
+                "────────────\n\n"
             )
         await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching payments: {e}")
-        await update.message.reply_text("❌ ክፍያዎችን መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ ክፍያዎችን መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -2079,7 +2199,7 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_daily_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -2105,22 +2225,22 @@ async def admin_daily_orders(update: Update, context: ContextTypes.DEFAULT_TYPE)
             )
             orders = cur.fetchall()
             if not orders:
-                await update.message.reply_text(f"❌ ለ{week_start} - {week_end} ሳምንት ትዕዛዞች የሉም።", reply_markup=get_main_keyboard(user.id))
+                await update.message.reply_text(f"❌ ለ{week_start} - {week_end} ሳምንት ትዕዛዞች የሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
                 return MAIN_MENU
-            text = f"📅 ለ{week_start} - {week_end} ሳምንት ትዕዛዞች (ዛሬ የለም):\n"
+            text = f"📅 ለ{week_start} - {week_end} ሳምንት ትዕዛዞች (ዛሬ የለም):\n\n"
         else:
-            text = f"📅 ለ{today} ትዕዛዞች:\n"
+            text = f"📅 ለ{today} ትዕዛዞች:\n\n"
         for full_name, username, meal_date, items_json in orders:
             items = json.loads(items_json) if isinstance(items_json, str) else items_json
-            text += f"ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\nቀን: {meal_date}\n"
+            text += f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n📅 ቀን: {meal_date}\n\n"
             for item in items:
-                text += f"- {item['name']} ({item['category']})\n"
-            text += "\n"
+                text += f"🍴 - {item['name']} ({item['category']})\n\n"
+            text += "────────────\n\n"
         await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching daily orders: {e}")
-        await update.message.reply_text("❌ የዕለት ትዕዛዞችን መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ የዕለት ትዕዛዞችን መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -2132,10 +2252,12 @@ async def admin_daily_orders(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def admin_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     await update.message.reply_text(
-        "📢 ለሁሉም ተጠቃሚዎች ለማስተላለፍ መልእክት ያስገቡ:",
+        "📢 ለሁሉም ተጠቃሚዎች ለማስተላለፍ መልእክት ያስገቡ:\n\n"
+        "🔧 መልእክት ያስገቡ!\n\n"
+        "🚀 ማስታወቂያ ያልፉ!",
         reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
     )
     return ADMIN_ANNOUNCE
@@ -2143,10 +2265,10 @@ async def admin_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_admin_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
-        await update.message.reply_text("❌ ማስታወቂያ ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ ማስታወቂያ ተሰርዟል።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     announcement = update.message.text
     conn = None
@@ -2160,15 +2282,15 @@ async def process_admin_announce(update: Update, context: ContextTypes.DEFAULT_T
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
-                    text=f"📢 ማስታወቂያ: {announcement}"
+                    text=f"📢 ማስታወቂያ:\n\n{announcement}\n\n🚀 በደህና ይጠቀሙ!"
                 )
             except Exception as e:
                 logger.error(f"Error sending announcement to user {user_id}: {e}")
-        await update.message.reply_text("✅ ማስታወቂያ ለሁሉም ተጠቃሚዎች ተላከ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("✅ ማስታወቂያ ለሁሉም ተጠቃሚዎች ተላከ።\n\n🚀 ተላከ!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error sending announcement: {e}")
-        await update.message.reply_text("❌ ማስታወቂያ በማላክ ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ ማስታወቂያ በማላክ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
         return ADMIN_ANNOUNCE
     finally:
         if cur:
@@ -2180,10 +2302,12 @@ async def process_admin_announce(update: Update, context: ContextTypes.DEFAULT_T
 async def set_admin_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     await update.message.reply_text(
-        "📍 የካፌ ቦታ ያጋሩ ወይም 'ዝለል'።",
+        "📍 የካፌ ቦታ ያጋሩ ወይም 'ዝለል'።\n\n"
+        "🔧 ቦታ ያጋሩ!\n\n"
+        "🚀 ቦታ ይዘጋጁ!",
         reply_markup=ReplyKeyboardMarkup(
             [[{"text": "📍 ቦታ አጋራ", "request_location": True}, "ዝለል", '🔙 ተመለስ']],
             resize_keyboard=True,
@@ -2195,10 +2319,10 @@ async def set_admin_location(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def process_set_admin_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text in ['🔙 ተመለስ', 'ዝለል']:
-        await update.message.reply_text("❌ ቦታ ማዘጋጀት ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ ቦታ ማዘጋጀት ተሰርዟል።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     location = None
     if update.message.location:
@@ -2208,7 +2332,7 @@ async def process_set_admin_location(update: Update, context: ContextTypes.DEFAU
             location = f"({latitude:.6f}, {longitude:.6f})"
         except Exception as e:
             logger.error(f"Error processing location: {e}")
-            await update.message.reply_text("❌ የማይሰራ ቦታ። እባክዎ እንደገና ይሞክሩ ወይም 'ዝለል' ይፃፉ።", reply_markup=ReplyKeyboardMarkup([["ዝለል", '🔙 ተመለስ']], resize_keyboard=True))
+            await update.message.reply_text("❌ የማይሰራ ቦታ።\n\n🔄 እባክዎ እንደገና ይሞክሩ ወይም 'ዝለል' ይፃፉ።\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([["ዝለል", '🔙 ተመለስ']], resize_keyboard=True))
             return SET_ADMIN_LOCATION
     else:
         location = update.message.text
@@ -2223,11 +2347,11 @@ async def process_set_admin_location(update: Update, context: ContextTypes.DEFAU
             (f"admin_location_{user.id}", location)
         )
         conn.commit()
-        await update.message.reply_text("✅ ቦታ በተሳካ ሁኔታ ተዘጋጅቷል።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("✅ ቦታ በተሳካ ሁኔታ ተዘጋጅቷል።\n\n🚀 ተዘጋጅቷል!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error setting admin location: {e}")
-        await update.message.reply_text("❌ ቦታ በማዘጋጀት ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=ReplyKeyboardMarkup([["��ለል", '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ ቦታ በማዘጋጀት ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([["ዝለል", '🔙 ተመለስ']], resize_keyboard=True))
         return SET_ADMIN_LOCATION
     finally:
         if cur:
@@ -2239,7 +2363,7 @@ async def process_set_admin_location(update: Update, context: ContextTypes.DEFAU
 async def view_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌አስተዳዳሪ አይደሉም።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -2251,11 +2375,11 @@ async def view_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         locations = cur.fetchall()
         if not locations:
-            await update.message.reply_text("❌ የተዘጋጁ ቦታዎች የሉም።", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ የተዘጋጁ ቦታዎች የሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
         for key, value in locations:
             admin_id = key.replace('admin_location_', '')
-            await update.message.reply_text(f"📍 አስተዳዳሪ {admin_id}: {value}")
+            await update.message.reply_text(f"📍 አስተዳዳሪ {admin_id}: {value}\n\n🔧 ቦታ ተመልክቷል!")
             if value.startswith('(') and ',' in value:
                 try:
                     match = re.match(r'\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)', value)
@@ -2265,14 +2389,14 @@ async def view_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await context.bot.send_location(chat_id=user.id, latitude=lat, longitude=lon)
                 except Exception as e:
                     logger.error(f"Error sending location for admin {admin_id}: {e}")
-                    await update.message.reply_text(f"❌ ለአስተዳዳሪ {admin_id} ማፕ ማሳየት ላይ ስህተት።")
+                    await update.message.reply_text(f"❌ ለአስተዳዳሪ {admin_id} ማፕ ማሳየት ላይ ስህተት።\n\n🔄 እንደገና ይሞክሩ!")
             else:
-                await update.message.reply_text(f"ℹ️ ለአስተዳዳሪ {admin_id}: የማፕ ትውልድ የለም (ጽሑፍ ቦታ)።")
-        await update.message.reply_text("✅ የተጋሩ ቦታዎች ተመልክተዋል።", reply_markup=get_main_keyboard(user.id))
+                await update.message.reply_text(f"ℹ️ ለአስተዳዳሪ {admin_id}: የማፕ ትውልድ የለም (ጽሑፍ ቦታ)።\n\n🔧 ጽሑፍ ቦታ!")
+        await update.message.reply_text("✅ የተጋሩ ቦታዎች ተመልክተዋል።\n\n🚀 ተመልክተዋል!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching locations: {e}")
-        await update.message.reply_text("❌ ቦታዎችን መጫን ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ ቦታዎችን መጫን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -2285,11 +2409,14 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     context.user_data.clear()
     await update.message.reply_text(
-        "❌ ሥራ ተሰርዟል።",
+        "❌ ሥራ ተሰርዟል።\n\n"
+        "🔙 ወደ መነሻ ገጽ!",
         reply_markup=ReplyKeyboardRemove()
     )
     await update.message.reply_text(
-        "👋 እንኳን ተመልሰው መጡ! አማራጭ ይምረጡ:",
+        "👋 እንኳን ተመልሰው መጡ!\n\n"
+        "🍽 አማራጭ ይምረጡ:\n\n"
+        "🚀 ይጀምሩ!",
         reply_markup=get_main_keyboard(user.id)
     )
     return MAIN_MENU
@@ -2298,7 +2425,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error {context.error}")
     if update and update.message:
-        await update.message.reply_text("❌ ስህተት ተከሰተ። እባክዎ እንደገና ይሞክሩ ወይም ድጋፍ ያነጋግሩ።", reply_markup=get_main_keyboard(update.effective_user.id))
+        await update.message.reply_text("❌ ስህተት ተከሰተ።\n\n🔄 እባክዎ እንደገና ይሞክሩ ወይም ድጋፍ ያነጋግሩ።\n\n🚀 /start ይጠቀሙ!", reply_markup=get_main_keyboard(update.effective_user.id))
 
 # Main function to run the bot
 def main():
