@@ -2227,7 +2227,7 @@ async def process_set_admin_location(update: Update, context: ContextTypes.DEFAU
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error setting admin location: {e}")
-        await update.message.reply_text("❌ ቦታ በማዘጋጀት ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=ReplyKeyboardMarkup([["ዝለል", '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ ቦታ በማዘጋጀት ላይ ስህተት። እባክዎ እንደገና ይሞክሩ።", reply_markup=ReplyKeyboardMarkup([["��ለል", '🔙 ተመለስ']], resize_keyboard=True))
         return SET_ADMIN_LOCATION
     finally:
         if cur:
@@ -2330,7 +2330,7 @@ def main():
                 MAIN_MENU: [
                     MessageHandler(filters.Regex('^🍽 ምግብ ዝርዝር$'), show_menu),
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
-                    MessageHandler(filters.Regex('^👤 የእኔ መ���ጃ$'), user_profile),  # ✅ Updated to user_profile
+                    MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), my_subscription),
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
                     MessageHandler(filters.Regex('^📞 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር አዘምን$'), admin_update_menu),
