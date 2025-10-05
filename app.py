@@ -1544,10 +1544,6 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 (user.id, subscription_id, meal_date, json.dumps(items), 'confirmed')
             )
         conn.commit()
-        # Schedule test announcement to all subscribers after 3 minutes
-        when = datetime.now(EAT) + timedelta(minutes=3)
-        context.application.job_queue.run_once(send_test_announcement, when=when, data={'message': 'Test automated message after subscription and order for testing purpose!'})
-        # Notify admins about payment
         for admin_id in ADMIN_IDS:
             try:
                 if not validators.url(receipt_url):
@@ -1619,38 +1615,6 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
         )
         return PAYMENT_UPLOAD
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
-# Test automated announcement function
-async def send_test_announcement(context: ContextTypes.DEFAULT_TYPE):
-    job = context.job
-    message = job.data.get('message', 'Test automated message!')
-    conn = None
-    cur = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT DISTINCT u.telegram_id
-            FROM public.subscriptions s
-            JOIN public.users u ON s.user_id = u.telegram_id
-            WHERE s.status = 'active'
-        """)
-        subscribers = cur.fetchall()
-        for (user_id,) in subscribers:
-            try:
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text=f"📢 {message}\n\n🚀 This is a test message sent to all subscribers after 3 minutes of a new subscription and order."
-                )
-            except Exception as e:
-                logger.error(f"Error sending test announcement to subscriber {user_id}: {e}")
-    except Exception as e:
-        logger.error(f"Error in send_test_announcement: {e}")
     finally:
         if cur:
             cur.close()
