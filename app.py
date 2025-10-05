@@ -3,7 +3,7 @@ import logging
 import json
 import psycopg2
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import pytz
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, ConversationHandler, filters, CallbackQueryHandler
@@ -1544,6 +1544,10 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 (user.id, subscription_id, meal_date, json.dumps(items), 'confirmed')
             )
         conn.commit()
+        # Schedule test announcement to all subscribers after 3 minutes
+        when = datetime.now(EAT) + timedelta(minutes=3)
+        context.application.job_queue.run_once(send_test_announcement, when=when, data={'message': 'Test automated message after subscription and order for testing purpose!'})
+        # Notify admins about payment
         for admin_id in ADMIN_IDS:
             try:
                 if not validators.url(receipt_url):
@@ -1615,6 +1619,38 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
         )
         return PAYMENT_UPLOAD
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+# Test automated announcement function
+async def send_test_announcement(context: ContextTypes.DEFAULT_TYPE):
+    job = context.job
+    message = job.data.get('message', 'Test automated message!')
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT u.telegram_id
+            FROM public.subscriptions s
+            JOIN public.users u ON s.user_id = u.telegram_id
+            WHERE s.status = 'active'
+        """)
+        subscribers = cur.fetchall()
+        for (user_id,) in subscribers:
+            try:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=f"📢 {message}\n\n🚀 This is a test message sent to all subscribers after 3 minutes of a new subscription and order."
+                )
+            except Exception as e:
+                logger.error(f"Error sending test announcement to subscriber {user_id}: {e}")
+    except Exception as e:
+        logger.error(f"Error in send_test_announcement: {e}")
     finally:
         if cur:
             cur.close()
@@ -2404,6 +2440,79 @@ async def view_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
+# Automated reminder functions
+async def send_lunch_reminders(context: ContextTypes.DEFAULT_TYPE):
+    today = datetime.now(EAT).date()
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT u.telegram_id, u.full_name, o.items, p.amount
+            FROM public.orders o 
+            JOIN public.users u ON o.user_id = u.telegram_id
+            JOIN public.subscriptions s ON o.subscription_id = s.id
+            LEFT JOIN public.payments p ON s.id = p.subscription_id AND p.status = 'approved'
+            WHERE o.meal_date = %s AND s.status = 'active' AND s.plan_type = 'lunch'
+        """, (today,))
+        users_data = cur.fetchall()
+        for user_id, full_name, items_json, total_amount in users_data:
+            items = json.loads(items_json) if isinstance(items_json, str) else items_json
+            message = f"🍽 ምስጋና! {full_name or 'ተጠቃሚ'}\n\n"
+            message += "የቀን ምግብዎ ዝግጁ ሆነ!\n\n"
+            for item in items:
+                message += f"🍴 {item['name']} - {item['price']:.2f} ብር\n"
+            message += f"💰 ጠቅላላ ክፍያ: {total_amount or 'የለም'} ብር\n\n"
+            message += "🚀 በደህና በታትተው ይጠቀሙ!"
+            try:
+                await context.bot.send_message(chat_id=user_id, text=message)
+            except Exception as e:
+                logger.error(f"Error sending lunch reminder to {user_id}: {e}")
+    except Exception as e:
+        logger.error(f"Error in send_lunch_reminders: {e}")
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+async def send_dinner_reminders(context: ContextTypes.DEFAULT_TYPE):
+    today = datetime.now(EAT).date()
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DISTINCT u.telegram_id, u.full_name, o.items, p.amount
+            FROM public.orders o 
+            JOIN public.users u ON o.user_id = u.telegram_id
+            JOIN public.subscriptions s ON o.subscription_id = s.id
+            LEFT JOIN public.payments p ON s.id = p.subscription_id AND p.status = 'approved'
+            WHERE o.meal_date = %s AND s.status = 'active' AND s.plan_type = 'dinner'
+        """, (today,))
+        users_data = cur.fetchall()
+        for user_id, full_name, items_json, total_amount in users_data:
+            items = json.loads(items_json) if isinstance(items_json, str) else items_json
+            message = f"🥘 ምስጋና! {full_name or 'ተጠቃሚ'}\n\n"
+            message += "የምሳ ምግብዎ ዝግጁ ሆነ!\n\n"
+            for item in items:
+                message += f"🍴 {item['name']} - {item['price']:.2f} ብር\n"
+            message += f"💰 ጠቅላላ ክፍያ: {total_amount or 'የለም'} ብር\n\n"
+            message += "🚀 በደህና በታትተው ይጠቀሙ!"
+            try:
+                await context.bot.send_message(chat_id=user_id, text=message)
+            except Exception as e:
+                logger.error(f"Error sending dinner reminder to {user_id}: {e}")
+    except Exception as e:
+        logger.error(f"Error in send_dinner_reminders: {e}")
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
 # Cancel command
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -2520,6 +2629,9 @@ def main():
         application.add_handler(CallbackQueryHandler(handle_payment_callback, pattern='^(approve|reject)_payment_'))
         application.add_handler(CallbackQueryHandler(handle_location_callback, pattern='^(approve|reject)_location_'))
         application.add_error_handler(error_handler)
+        # Schedule daily reminders
+        application.job_queue.run_daily(send_lunch_reminders, time=time(9, 0, tzinfo=EAT))
+        application.job_queue.run_daily(send_dinner_reminders, time=time(15, 0, tzinfo=EAT))
         while True:
             try:
                 application.run_polling(drop_pending_updates=True, bootstrap_retries=-1, timeout=10, poll_interval=1, allowed_updates=Update.ALL_TYPES)
