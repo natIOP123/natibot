@@ -965,22 +965,6 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             plan = context.user_data.get('plan')
             expiry_date = datetime.now(EAT) + timedelta(days=plan['duration_days'])
             selected_dates_en_list = [valid_days_en[valid_days_am.index(day)] for day in selected_dates]
-            cur.execute("""
-                SELECT 1
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                AND table_name = 'subscriptions'
-                AND column_name = 'selected_dates'
-            """)
-            if not cur.fetchone():
-                logger.error("selected_dates column missing in subscriptions table")
-                await update.message.reply_text(
-                    "❌ የዳታቤዝ ቅንብር ስህተት።\n\n"
-                    "💬 እባክዎ ድጋፍ ያነጋግሩ ወይም ቆይተው እንደገና ይሞክሩ።\n\n"
-                    "🔄 እንደገና ይሞክሩ!",
-                    reply_markup=get_main_keyboard(user.id)
-                )
-                return MAIN_MENU
             cur.execute(
                 "INSERT INTO public.subscriptions (user_id, plan_type, meals_remaining, selected_dates, expiry_date, status) "
                 "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
