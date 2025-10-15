@@ -297,7 +297,7 @@ def get_main_keyboard(user_id):
     else:
         keyboard = [
             ['🍽 ምግብ ዝርዝር', '🛒 ምዝገባ'],
-            ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች', '🔄 ማዘዋወር'],
+            ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች', '🔄 ትዕዛዙን መዘዋወር'],
             ['📞 ድጋፍ']
         ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -691,11 +691,51 @@ async def process_reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return RESCHEDULE_MEAL
         selected_order = eligible_orders[idx]
         context.user_data['selected_order'] = selected_order
+        # Compute possible future dates
+        current_date = datetime.now(EAT).date()
+        expiry_date = selected_order['expiry'].date()
+        possible_dates = []
+        valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        valid_days_am = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
+        conn = None
+        cur = None
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            for i in range(1, (expiry_date - current_date).days + 1):
+                candidate = current_date + timedelta(days=i)
+                cur.execute(
+                    "SELECT 1 FROM public.orders WHERE user_id = %s AND meal_date = %s AND status = 'confirmed'",
+                    (user.id, candidate)
+                )
+                if not cur.fetchone():
+                    day_en = valid_days_en[candidate.weekday()]
+                    day_am = valid_days_am[valid_days_en.index(day_en)]
+                    date_str = candidate.strftime('%Y-%m-%d')
+                    button_text = f"{day_am} ({date_str})"
+                    possible_dates.append((candidate, button_text))
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
+        if not possible_dates:
+            await update.message.reply_text(
+                "❌ ለማዘዋወር ተስማሚ ቀን የለም።\n\n"
+                "🔄 እባክዎ እንደገና ይሞክሩ!",
+                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+            )
+            return RESCHEDULE_DATE
+        context.user_data['possible_dates'] = possible_dates
+        # Build keyboard with buttons for possible dates
+        keyboard = []
+        for _, button_text in possible_dates:
+            keyboard.append([button_text])
+        keyboard.append(['🔙 ተመለስ'])
         await update.message.reply_text(
-            "📅 አዲሱን ቀን ያስገቡ (YYYY-MM-DD ቅርጽ በ):\n\n"
-            "📌 ለምሳሌ: 2025-10-20\n\n"
-            "🚫 አሁን ካለፈበት ቀን አይጠቀሙም።",
-            reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+            "📅 አዲሱን ቀን ይምረጡ (ከዛሬ ቀጣይ ቀናት እስከ ጫናዎ ውስጥ):\n\n"
+            "🚀 ቀን ይምረጡ!",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
         )
         return RESCHEDULE_DATE
     except ValueError:
@@ -713,74 +753,55 @@ async def reschedule_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == '🔙 ተመለስ':
         context.user_data.pop('eligible_orders', None)
         context.user_data.pop('selected_order', None)
+        context.user_data.pop('possible_dates', None)
         return await back_to_main(update, context)
     selected_order = context.user_data.get('selected_order')
     if not selected_order:
         await update.message.reply_text("❌ ስህተት: ትዕዛዝ አልተመረጠም።\n\n🔄 /select_meals ይጀምሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
-    try:
-        new_date = datetime.strptime(text, '%Y-%m-%d').date()
-        current_date = datetime.now(EAT).date()
-        if new_date <= current_date:
-            await update.message.reply_text(
-                "❌ የሚታወቅ ቀን የወደፊት መሆን አለበት።\n\n"
-                "🔄 ትክክለኛ ቀን ያስገቡ!",
-                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
-            )
-            return RESCHEDULE_DATE
-        expiry_date = selected_order['expiry'].date()
-        if new_date > expiry_date:
-            await update.message.reply_text(
-                f"❌ አዲሱ ቀን የምዝገባዎ ጫና ({expiry_date}) ውስጥ መሆን አለበት።\n\n"
-                "🔄 ትክክለኛ ቀን ያስገቡ!",
-                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
-            )
-            return RESCHEDULE_DATE
-        # Check if new date already has order
-        conn = None
-        cur = None
-        try:
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT 1 FROM public.orders WHERE user_id = %s AND meal_date = %s AND status = 'confirmed'",
-                (user.id, new_date)
-            )
-            if cur.fetchone():
-                await update.message.reply_text(
-                    "❌ በዚህ ቀን ቀደም ብሎ ትዕዛዝ አለዎት።\n\n"
-                    "🔄 ሌላ ቀን ይምረጡ!",
-                    reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
-                )
-                return RESCHEDULE_DATE
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-        # Confirm
-        old_date_str = selected_order['meal_date'].strftime('%Y-%m-%d')
-        plan_am = 'ምሳ' if selected_order['plan_type'] == 'lunch' else 'እራት'
-        confirm_text = (
-            f"🔄 ማዘዋወር ማረጋገጫ:\n\n"
-            f"ከ {old_date_str} ({plan_am}) ወደ {new_date}\n\n"
-            f"🍴 {selected_order['item']['name']}\n\n"
-            "✅ ያረጋግጡ?"
-        )
-        keyboard = [['✅ አረጋግጥ', '⛔ ሰርዝ'], ['🔙 ተመለስ']]
-        context.user_data['new_date'] = new_date
+    possible_dates = context.user_data.get('possible_dates', [])
+    new_date = None
+    for candidate, button_text in possible_dates:
+        if text == button_text:
+            new_date = candidate
+            break
+    if not new_date:
+        # Invalid selection, reprompt
+        keyboard = []
+        for _, button_text in possible_dates:
+            keyboard.append([button_text])
+        keyboard.append(['🔙 ተመለስ'])
         await update.message.reply_text(
-            confirm_text,
-            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            "❌ የማይሰራ ምርጫ።\n\n"
+            "📅 ትክክለኛ ቀን ይምረጡ:\n\n"
+            "🚀 ቀን ይምረጡ!",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
         )
-        return RESCHEDULE_CONFIRM
-    except ValueError:
+        return RESCHEDULE_DATE
+    expiry_date = selected_order['expiry'].date()
+    if new_date > expiry_date:
         await update.message.reply_text(
-            "❌ የማይሰራ ቀን ቅርጽ። YYYY-MM-DD ይጠቀሙ (ለምሳሌ: 2025-10-20)\n\n"
+            f"❌ አዲሱ ቀን የምዝገባዎ ጫና ({expiry_date}) ውስጥ መሆን አለበት።\n\n"
             "🔄 ትክክለኛ ቀን ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
         return RESCHEDULE_DATE
+    # Confirm
+    old_date_str = selected_order['meal_date'].strftime('%Y-%m-%d')
+    plan_am = 'ምሳ' if selected_order['plan_type'] == 'lunch' else 'እራት'
+    confirm_text = (
+        f"🔄 ማዘዋወር ማረጋገጫ:\n\n"
+        f"ከ {old_date_str} ({plan_am}) ወደ {new_date}\n\n"
+        f"🍴 {selected_order['item']['name']}\n\n"
+        "✅ ያረጋግጡ?"
+    )
+    keyboard = [['✅ አረጋግጥ', '⛔ ሰርዝ'], ['🔙 ተመለስ']]
+    context.user_data['new_date'] = new_date
+    await update.message.reply_text(
+        confirm_text,
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
+    return RESCHEDULE_CONFIRM
 
 # Confirm Reschedule
 async def confirm_reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -790,11 +811,13 @@ async def confirm_reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data.pop('eligible_orders', None)
         context.user_data.pop('selected_order', None)
         context.user_data.pop('new_date', None)
+        context.user_data.pop('possible_dates', None)
         return await back_to_main(update, context)
     if choice == '⛔ ሰርዝ':
         context.user_data.pop('eligible_orders', None)
         context.user_data.pop('selected_order', None)
         context.user_data.pop('new_date', None)
+        context.user_data.pop('possible_dates', None)
         await update.message.reply_text("❌ ማዘዋወር ተሰርዟል።", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if choice == '✅ አረጋግጥ':
@@ -831,6 +854,7 @@ async def confirm_reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data.pop('eligible_orders', None)
         context.user_data.pop('selected_order', None)
         context.user_data.pop('new_date', None)
+        context.user_data.pop('possible_dates', None)
         return MAIN_MENU
     # Reprompt if invalid
     await update.message.reply_text(
@@ -2834,7 +2858,7 @@ def main():
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
                     MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), user_profile),
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
-                    MessageHandler(filters.Regex('^🔄 ማዘዋወር$'), reschedule_start),
+                    MessageHandler(filters.Regex('^🔄 ትዕዛዙን መዘዋወር$'), reschedule_start),
                     MessageHandler(filters.Regex('^📞 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር አዘምን$'), admin_update_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር ሰርዝ$'), admin_delete_menu),
