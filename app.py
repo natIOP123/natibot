@@ -11,6 +11,9 @@ import math
 import validators
 from time import sleep
 from shapely.geometry import Point, Polygon
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from io import BytesIO
 
 # Enable logging
 logging.basicConfig(
@@ -61,8 +64,9 @@ default_menu = [
     CHOOSE_PLAN, CHOOSE_DATE, MEAL_SELECTION, CONFIRM_MEAL, PAYMENT_UPLOAD,
     RESCHEDULE_MEAL, ADMIN_UPDATE_MENU, ADMIN_ANNOUNCE, ADMIN_DAILY_ORDERS,
     ADMIN_DELETE_MENU, SET_ADMIN_LOCATION, ADMIN_APPROVE_PAYMENT, SUPPORT_MENU,
-    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM
-) = range(22)
+    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM,
+    ADMIN_WEEKLY_REPORT
+) = range(23)
 
 # Database connection helper
 def get_db_connection():
@@ -292,7 +296,8 @@ def get_main_keyboard(user_id):
             ['🔐 ተመዝጋቢዎችን ተመልከት', '🔐 ክፍያዎችን ተመልከት'],
             ['🔐 ክፍያዎችን አረጋግጥ', '🔐 የዕለት ትዕዛዞች'],
             ['🔐 ማስታወቂያ', '🔐 ቦታ አዘጋጅ'],
-            ['🔐 ቦታዎችን ተመልከት', '🔐 ቦታዎችን አረጋግጥ']
+            ['🔐 ቦታዎችን ተመልከት', '🔐 ቦታዎችን አረጋግጥ'],
+            ['🔐 የሳምንት ትዕዛዞች ሪፖርት']
         ]
     else:
         keyboard = [
@@ -1947,6 +1952,125 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
+# Admin: Generate Weekly Orders PDF Report
+async def admin_weekly_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if user.id not in ADMIN_IDS:
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        today = datetime.now(EAT).date()
+        week_start = today - timedelta(days=today.weekday())
+        week_end = week_start + timedelta(days=6)
+        cur.execute("""
+            SELECT 
+                o.id as order_id,
+                u.full_name,
+                u.username,
+                u.phone_number,
+                u.location,
+                o.meal_date,
+                o.items,
+                s.plan_type,
+                p.amount as payment_amount,
+                p.status as payment_status,
+                p.created_at as payment_date
+            FROM public.orders o
+            JOIN public.users u ON o.user_id = u.telegram_id
+            JOIN public.subscriptions s ON o.subscription_id = s.id
+            LEFT JOIN public.payments p ON s.id = p.subscription_id AND p.status = 'approved'
+            WHERE o.meal_date BETWEEN %s AND %s AND o.status = 'confirmed'
+            ORDER BY o.meal_date, u.full_name
+        """, (week_start, week_end))
+        orders_data = cur.fetchall()
+        if not orders_data:
+            await update.message.reply_text(
+                f"❌ ለ{week_start} - {week_end} ሳምንት ትዕዛዞች የሉም።\n\n🔙 ወደ መነሻ ገጽ!",
+                reply_markup=get_main_keyboard(user.id)
+            )
+            return MAIN_MENU
+
+        # Generate PDF
+        buffer = BytesIO()
+        p = canvas.Canvas(buffer, pagesize=letter)
+        width, height = letter
+        y = height - 50
+        p.drawString(100, y, f"Weekly Food Orders Report: {week_start} to {week_end}")
+        y -= 30
+        p.drawString(100, y, f"Generated on: {datetime.now(EAT).strftime('%Y-%m-%d %H:%M')}")
+        y -= 50
+
+        total_revenue = 0
+        daily_orders = {}
+        for order_id, full_name, username, phone_number, location, meal_date, items_json, plan_type, payment_amount, payment_status, payment_date in orders_data:
+            items = json.loads(items_json) if isinstance(items_json, str) else items_json
+            daily_orders.setdefault(meal_date, []).append({
+                'full_name': full_name,
+                'username': username,
+                'phone_number': phone_number,
+                'location': location,
+                'items': items,
+                'plan_type': plan_type,
+                'payment_amount': payment_amount or 0,
+                'payment_status': payment_status or 'No Payment'
+            })
+            total_revenue += (payment_amount or 0)
+
+        for meal_date, day_orders in daily_orders.items():
+            if y < 100:
+                p.showPage()
+                y = height - 50
+            p.drawString(100, y, f"Date: {meal_date} - Orders: {len(day_orders)}")
+            y -= 20
+            for order in day_orders:
+                if y < 100:
+                    p.showPage()
+                    y = height - 50
+                p.drawString(120, y, f"User: {order['full_name']} (@{order['username'] or 'N/A'})")
+                y -= 15
+                p.drawString(120, y, f"Phone: {order['phone_number']}")
+                y -= 15
+                p.drawString(120, y, f"Location: {order['location']}")
+                y -= 15
+                p.drawString(120, y, f"Plan: {order['plan_type']}")
+                y -= 15
+                p.drawString(120, y, f"Payment: {order['payment_amount']:.2f} ETB - Status: {order['payment_status']}")
+                y -= 20
+                p.drawString(140, y, "Items:")
+                y -= 15
+                for item in order['items']:
+                    p.drawString(160, y, f"- {item['name']} ({item['price']:.2f} ETB)")
+                    y -= 15
+                y -= 10
+
+        if y < 100:
+            p.showPage()
+            y = height - 50
+        p.drawString(100, y, f"Summary - Total Orders: {len(orders_data)}, Total Revenue: {total_revenue:.2f} ETB")
+        p.save()
+        buffer.seek(0)
+
+        await update.message.reply_document(
+            document=buffer,
+            filename=f"weekly_orders_report_{week_start}.pdf",
+            caption="📊 Weekly Orders PDF Report"
+        )
+        await update.message.reply_text("✅ የሳምንት ትዕዛዞች ሪፖርት PDF ተላከ።\n\n🚀 ተላከ!", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    except Exception as e:
+        logger.error(f"Error generating weekly report: {e}")
+        await update.message.reply_text("❌ የሪፖርት መፍጠር ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
 # Admin: Approve or reject location
 async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -2870,6 +2994,7 @@ def main():
                     MessageHandler(filters.Regex('^🔐 ቦታ አዘጋጅ$'), set_admin_location),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን ተመልከት$'), view_locations),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን አረጋግጥ$'), admin_approve_locations),
+                    MessageHandler(filters.Regex('^🔐 የሳምንት ትዕዛዞች ሪፖርት$'), admin_weekly_report),
                     MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^⏳ ማረጋገጫ በመጠበቅ ላይ$'), lambda u, c: MAIN_MENU),  # Restricted
@@ -2921,6 +3046,9 @@ def main():
                 SUPPORT_MENU: [
                     MessageHandler(filters.Regex('^🔙 ተመለስ$'), back_to_main)
                 ],
+                ADMIN_WEEKLY_REPORT: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, lambda u, c: MAIN_MENU)
+                ]
             },
             fallbacks=[CommandHandler('cancel', cancel)],
             allow_reentry=True
