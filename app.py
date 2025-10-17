@@ -11,7 +11,6 @@ import math
 import validators
 from time import sleep
 from shapely.geometry import Point, Polygon
-from fpdf import FPDF
 
 # Enable logging
 logging.basicConfig(
@@ -62,9 +61,8 @@ default_menu = [
     CHOOSE_PLAN, CHOOSE_DATE, MEAL_SELECTION, CONFIRM_MEAL, PAYMENT_UPLOAD,
     RESCHEDULE_MEAL, ADMIN_UPDATE_MENU, ADMIN_ANNOUNCE, ADMIN_DAILY_ORDERS,
     ADMIN_DELETE_MENU, SET_ADMIN_LOCATION, ADMIN_APPROVE_PAYMENT, SUPPORT_MENU,
-    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM,
-    ADMIN_PRINT_REPORT
-) = range(23)
+    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM
+) = range(22)
 
 # Database connection helper
 def get_db_connection():
@@ -294,8 +292,7 @@ def get_main_keyboard(user_id):
             ['🔐 ተመዝጋቢዎችን ተመልከት', '🔐 ክፍያዎችን ተመልከት'],
             ['🔐 ክፍያዎችን አረጋግጥ', '🔐 የዕለት ትዕዛዞች'],
             ['🔐 ማስታወቂያ', '🔐 ቦታ አዘጋጅ'],
-            ['🔐 ቦታዎችን ተመልከት', '🔐 ቦታዎችን አረጋግጥ'],
-            ['🔐 ሪፖርት ማተም']
+            ['🔐 ቦታዎችን ተመልከት', '🔐 ቦታዎችን አረጋግጥ']
         ]
     else:
         keyboard = [
@@ -1950,82 +1947,6 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
-# Admin: Print Report
-async def admin_print_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    await update.message.reply_text("⏳ ሪፖርት በማተም ላይ ነው... በቅርቡ ይደርሳል!")
-    conn = None
-    cur = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        # Fetch all users
-        cur.execute("SELECT telegram_id, full_name, phone_number, location, created_at FROM public.users ORDER BY created_at DESC")
-        users = cur.fetchall()
-        # Fetch all subscriptions
-        cur.execute("SELECT s.id, s.user_id, s.plan_type, s.meals_remaining, s.expiry_date, s.status, s.created_at FROM public.subscriptions s ORDER BY s.created_at DESC")
-        subscriptions = cur.fetchall()
-        # Fetch all orders
-        cur.execute("SELECT o.id, o.user_id, o.subscription_id, o.meal_date, o.items, o.status, o.created_at FROM public.orders o ORDER BY o.created_at DESC")
-        orders = cur.fetchall()
-        # Fetch all payments
-        cur.execute("SELECT p.id, p.user_id, p.subscription_id, p.amount, p.status, p.created_at, p.receipt_url FROM public.payments p ORDER BY p.created_at DESC")
-        payments = cur.fetchall()
-        # Generate PDF
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(200, 10, txt="Oz Kitchen Report", ln=1, align='C')
-        pdf.ln(10)
-        # Users Section
-        pdf.cell(200, 10, txt="1. All Users", ln=1)
-        for uid, full_name, phone, location, created_at in users:
-            pdf.cell(200, 5, txt=f"ID: {uid}, Name: {full_name or 'N/A'}, Phone: {phone or 'N/A'}, Location: {location or 'N/A'}, Created: {created_at}", ln=1)
-        pdf.ln(5)
-        # Subscriptions Section
-        pdf.cell(200, 10, txt="2. All Subscriptions", ln=1)
-        for sub_id, sub_user_id, plan_type, meals_rem, expiry, status, created_at in subscriptions:
-            pdf.cell(200, 5, txt=f"ID: {sub_id}, User: {sub_user_id}, Plan: {plan_type}, Meals Left: {meals_rem}, Expiry: {expiry}, Status: {status}, Created: {created_at}", ln=1)
-        pdf.ln(5)
-        # Orders Section
-        pdf.cell(200, 10, txt="3. All Orders", ln=1)
-        for order_id, order_user_id, sub_id, meal_date, items_json, status, created_at in orders:
-            items = json.loads(items_json) if isinstance(items_json, str) else items_json
-            items_str = '; '.join([f"{i['name']} ({i['price']})" for i in items])
-            pdf.cell(200, 5, txt=f"ID: {order_id}, User: {order_user_id}, Sub: {sub_id}, Date: {meal_date}, Items: {items_str}, Status: {status}, Created: {created_at}", ln=1)
-        pdf.ln(5)
-        # Payments Section
-        pdf.cell(200, 10, txt="4. All Payments (Paid Users)", ln=1)
-        paid_users = set()
-        for pay_id, pay_user_id, sub_id, amount, status, created_at, receipt in payments:
-            if status == 'approved':
-                paid_users.add(pay_user_id)
-            pdf.cell(200, 5, txt=f"ID: {pay_id}, User: {pay_user_id}, Sub: {sub_id}, Amount: {amount}, Status: {status}, Created: {created_at}, Receipt: {receipt or 'N/A'}", ln=1)
-        pdf.ln(5)
-        pdf.cell(200, 10, txt=f"5. Users Who Paid: {len(paid_users)} total", ln=1)
-        for pu in paid_users:
-            pdf.cell(200, 5, txt=f"Paid User ID: {pu}", ln=1)
-        pdf_output = "oz_report.pdf"
-        pdf.output(pdf_output)
-        # Send PDF
-        with open(pdf_output, 'rb') as pdf_file:
-            await context.bot.send_document(chat_id=user.id, document=pdf_file, filename="oz_report.pdf")
-        os.remove(pdf_output)
-        await update.message.reply_text("✅ ሪፖርት PDF ተላከ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    except Exception as e:
-        logger.error(f"Error generating report: {e}")
-        await update.message.reply_text("❌ ሪፖርት ማተም ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
 # Admin: Approve or reject location
 async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -2949,7 +2870,6 @@ def main():
                     MessageHandler(filters.Regex('^🔐 ቦታ አዘጋጅ$'), set_admin_location),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን ተመልከት$'), view_locations),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን አረጋግጥ$'), admin_approve_locations),
-                    MessageHandler(filters.Regex('^🔐 ሪፖርት ማተም$'), admin_print_report),
                     MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^⏳ ማረጋገጫ በመጠበቅ ላይ$'), lambda u, c: MAIN_MENU),  # Restricted
@@ -3001,7 +2921,6 @@ def main():
                 SUPPORT_MENU: [
                     MessageHandler(filters.Regex('^🔙 ተመለስ$'), back_to_main)
                 ],
-                ADMIN_PRINT_REPORT: [lambda u, c: MAIN_MENU],
             },
             fallbacks=[CommandHandler('cancel', cancel)],
             allow_reentry=True
