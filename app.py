@@ -11,8 +11,6 @@ import math
 import validators
 from time import sleep
 from shapely.geometry import Point, Polygon
-from fpdf import FPDF
-from io import BytesIO
 
 # Enable logging
 logging.basicConfig(
@@ -294,8 +292,7 @@ def get_main_keyboard(user_id):
             ['🔐 ተመዝጋቢዎችን ተመልከት', '🔐 ክፍያዎችን ተመልከት'],
             ['🔐 ክፍያዎችን አረጋግጥ', '🔐 የዕለት ትዕዛዞች'],
             ['🔐 ማስታወቂያ', '🔐 ቦታ አዘጋጅ'],
-            ['🔐 ቦታዎችን ተመልከት', '🔐 ቦታዎችን አረጋግጥ'],
-            ['🔐 የሳምንቱ ትዕዛዞች PDF']
+            ['🔐 ቦታዎችን ተመልከት', '🔐 ቦታዎችን አረጋግጥ']
         ]
     else:
         keyboard = [
@@ -1950,84 +1947,6 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
-# Admin: Generate Weekly PDF Report
-async def generate_weekly_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    conn = None
-    cur = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        today = datetime.now(EAT).date()
-        week_start = today - timedelta(days=today.weekday())
-        week_end = week_start + timedelta(days=6)
-        cur.execute("""
-            SELECT u.full_name, u.phone_number, u.location, o.meal_date, o.items, p.amount, p.status
-            FROM public.orders o 
-            JOIN public.users u ON o.user_id = u.telegram_id
-            LEFT JOIN public.payments p ON o.subscription_id = p.subscription_id AND p.status = 'approved'
-            WHERE o.meal_date BETWEEN %s AND %s AND o.status = 'confirmed'
-            ORDER BY u.full_name, o.meal_date
-        """, (week_start, week_end))
-        orders = cur.fetchall()
-        class PDF(FPDF):
-            def header(self):
-                self.set_font('Arial', 'B', 15)
-                self.cell(0, 10, f'Weekly Food Orders Report - {week_start} to {week_end}', 0, 1, 'C')
-                self.ln(10)
-            def footer(self):
-                self.set_y(-15)
-                self.set_font('Arial', 'I', 8)
-                self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
-        pdf = PDF()
-        pdf.add_page()
-        pdf.set_font('Arial', '', 12)
-        if not orders:
-            pdf.cell(0, 10, 'No orders for this week.', 0, 1)
-        else:
-            current_user = None
-            for full_name, phone, location, meal_date, items_json, amount, pay_status in orders:
-                if full_name != current_user:
-                    if current_user:
-                        pdf.ln(10)
-                    pdf.set_font('Arial', 'B', 12)
-                    pdf.cell(0, 10, f'User: {full_name}', 0, 1)
-                    pdf.set_font('Arial', '', 10)
-                    pdf.cell(0, 5, f'Phone: {phone}', 0, 1)
-                    pdf.cell(0, 5, f'Location: {location}', 0, 1)
-                    pdf.ln(5)
-                    current_user = full_name
-                pdf.set_font('Arial', '', 10)
-                pdf.cell(0, 5, f'Date: {meal_date}', 0, 1)
-                items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                for item in items:
-                    pdf.cell(0, 5, f'  - {item["name"]} ({item["price"]} ETB)', 0, 1)
-                pdf.cell(0, 5, f'Payment: {amount or 0} ETB - Status: {pay_status or "Pending"}', 0, 1)
-                pdf.ln(5)
-        pdf_bytes = BytesIO()
-        pdf.output(pdf_bytes)
-        pdf_bytes.seek(0)
-        await context.bot.send_document(
-            chat_id=user.id,
-            document=pdf_bytes,
-            filename=f'weekly_orders_{week_start}.pdf',
-            caption='📄 Weekly Food Orders PDF Report'
-        )
-        await update.message.reply_text("✅ PDF ሪፖርት ተጠራል!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    except Exception as e:
-        logger.error(f"Error generating weekly PDF: {e}")
-        await update.message.reply_text("❌ PDF ሪፖርት በማመንጨት ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
 # Admin: Approve or reject location
 async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -2951,7 +2870,6 @@ def main():
                     MessageHandler(filters.Regex('^🔐 ቦታ አዘጋጅ$'), set_admin_location),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን ተመልከት$'), view_locations),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን አረጋግጥ$'), admin_approve_locations),
-                    MessageHandler(filters.Regex('^🔐 የሳምንቱ ትዕዛዞች PDF$'), generate_weekly_pdf),
                     MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^⏳ ማረጋገጫ በመጠበቅ ላይ$'), lambda u, c: MAIN_MENU),  # Restricted
