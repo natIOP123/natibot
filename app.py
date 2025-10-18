@@ -11,13 +11,8 @@ import math
 import validators
 from time import sleep
 from shapely.geometry import Point, Polygon
-import io
-from reportlab.lib.pagesizes import letter
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+from fpdf import FPDF
+from io import BytesIO
 
 # Enable logging
 logging.basicConfig(
@@ -68,8 +63,9 @@ default_menu = [
     CHOOSE_PLAN, CHOOSE_DATE, MEAL_SELECTION, CONFIRM_MEAL, PAYMENT_UPLOAD,
     RESCHEDULE_MEAL, ADMIN_UPDATE_MENU, ADMIN_ANNOUNCE, ADMIN_DAILY_ORDERS,
     ADMIN_DELETE_MENU, SET_ADMIN_LOCATION, ADMIN_APPROVE_PAYMENT, SUPPORT_MENU,
-    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM
-) = range(22)
+    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM,
+    PRINT_ORDER
+) = range(23)
 
 # Database connection helper
 def get_db_connection():
@@ -284,7 +280,7 @@ def build_delete_menu_text(menu_items, week_start):
     valid_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     day_order = {day: idx for idx, day in enumerate(valid_days)}
     sorted_items = sorted(menu_items, key=lambda x: day_order.get(x['day'], len(valid_days)))
-    text = f"📋 የምግብ ዝርዝር ለሳምንቱ መጀመሪያ {week_start} (ለመሰርዝ የተወሰነ ንጥል ይምረጡ):\n\n"
+    text = f"📋 የምግብ ዝርዝር ለሳምንቱ መጀመሪያ {week_start} (ለመሰረዝ የተወሰነ ንጥል ይምረጡ):\n\n"
     for idx, item in enumerate(sorted_items, 1):
         text += f"{idx}. {item['day']}: {item['name']} - {item['price']:.2f} ብር\n\n"
     return text
@@ -299,13 +295,13 @@ def get_main_keyboard(user_id):
             ['🔐 ተመዝጋቢዎችን ተመልከት', '🔐 ክፍያዎችን ተመልከት'],
             ['🔐 ክፍያዎችን አረጋግጥ', '🔐 የዕለት ትዕዛዞች'],
             ['🔐 ማስታወቂያ', '🔐 ቦታ አዘጋጅ'],
-            ['🔐 ቦታዎችን ተመልከት', '🔐 ቦታዎችን አረጋግጥ'],
-            ['🔐 ሪፖርት ማተም']
+            ['🔐 ቦታዎችን ተመልከት', '🔐 ቦታዎችን አረጋግጥ']
         ]
     else:
         keyboard = [
             ['🍽 ምግብ ዝርዝር', '🛒 ምዝገባ'],
-            ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች', '🔄 ትዕዛዙን መዘዋወር'],
+            ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች', '🖨 Print Order'],
+            ['🔄 ትዕዛዙን መዘዋወር'],
             ['📞 ድጋፍ']
         ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -325,7 +321,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📋 የአገልግሎቱ መግለጫዎች እና ሂደቶች:\n\n"
             "1️⃣ የምዝገባ እቅድዎን እና ቀን ይምረጡ\n\n"
             "2️⃣ የሚወዷቸውን ምግቦች ከምግብ ዝርዝር ውስጥ ይምረጡ (ወይንም ከፈለጉ በሼፍ ውሳኔ)\n\n"
-            "3️⃣ በየቀኑ የማስተወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።\n\n"
+            "3️⃣ በየቀኑ የማስታወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።\n\n"
             "🚀 ይጀምሩ!"
         )
         # Check if user is registered
@@ -349,6 +345,82 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error in start for user {user.id}: {e}")
         await update.message.reply_text("❌ በመጀመር ላይ ስህተት ተከስቷል። እባክዎ እንደገና ይሞክሩ።\n\n🔄 እንደገና ይሞክሩ!")
+        return MAIN_MENU
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+# Print Order Function
+async def print_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if has_pending_location(user.id):
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    if user.id in ADMIN_IDS:
+        await update.message.reply_text("❌ አስተዳዳሪዎች የታቀው ትዕዛዝ አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # Fetch orders
+        cur.execute(
+            "SELECT o.id, o.meal_date, o.items, o.created_at, p.amount, p.status as payment_status "
+            "FROM public.orders o "
+            "LEFT JOIN public.payments p ON o.subscription_id = p.subscription_id AND p.status = 'approved' "
+            "WHERE o.user_id = %s AND o.status = 'confirmed' ORDER BY o.created_at DESC",
+            (user.id,)
+        )
+        orders_data = cur.fetchall()
+        if not orders_data:
+            await update.message.reply_text(
+                "❌ ለመጽሔት ትዕዛዝ የለም።\n\n"
+                "📅 /my_meals ይመልከቱ!",
+                reply_markup=get_main_keyboard(user.id)
+            )
+            return MAIN_MENU
+        # Generate PDF
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=16)
+        pdf.cell(200, 10, txt="Oz Kitchen Order Details", ln=1, align='C')
+        pdf.ln(10)
+        pdf.set_font("Arial", size=12)
+        for order_id, meal_date, items_json, created_at, amount, payment_status in orders_data:
+            items = json.loads(items_json) if isinstance(items_json, str) else items_json
+            pdf.cell(200, 10, txt=f"Order ID: {order_id}", ln=1)
+            pdf.cell(200, 10, txt=f"Date Ordered: {created_at.strftime('%Y-%m-%d %H:%M')}", ln=1)
+            pdf.cell(200, 10, txt=f"Meal Date: {meal_date}", ln=1)
+            pdf.cell(200, 10, txt="Food Ordered:", ln=1)
+            total = 0
+            for item in items:
+                pdf.cell(200, 10, txt=f"- {item['name']} - {item['price']:.2f} ETB", ln=1)
+                total += item['price']
+            pdf.cell(200, 10, txt=f"Subtotal: {total:.2f} ETB", ln=1)
+            if amount:
+                pdf.cell(200, 10, txt=f"Payment Made: {amount:.2f} ETB ({payment_status})", ln=1)
+            else:
+                pdf.cell(200, 10, txt="Payment: Pending", ln=1)
+            pdf.ln(5)
+            pdf.cell(200, 10, txt="─" * 50, ln=1)
+            pdf.ln(5)
+        buffer = BytesIO()
+        pdf.output(dest=buffer)
+        buffer.seek(0)
+        await context.bot.send_document(
+            chat_id=update.effective_chat.id,
+            document=buffer,
+            filename=f"order_details_{user.id}.pdf",
+            caption="📄 Your Order Details PDF"
+        )
+        await update.message.reply_text("✅ PDF ተላከ! እባክዎ ይመልከቱ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    except Exception as e:
+        logger.error(f"Error generating PDF for user {user.id}: {e}")
+        await update.message.reply_text("❌ PDF መፍጠር ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -401,7 +473,7 @@ async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📋 የአገልግሎቱ መግለጫዎች እና ሂደቶች?\n\n"
         "1️⃣ የምዝገባ እቅድዎን እና ቀን ይምረጡ\n\n"
         "2️⃣ የሚወዷቸውን ምግቦች ከምግብ ዝርዝር ውስጥ ይምረጡ (ወይንም ከፈለጉ በሼፍ ውሳኔ)\n\n"
-        "3️⃣ በየቀኑ የማስተወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።\n\n"
+        "3️⃣ በየቀኑ የማስታወሻ መልክት ያገኛሉ እና አስፈላጊ ሆኖ ሲገኝ የመሰረዝ እና ወደሌላ የጊዜ ማዘዋወር ይቻላል።\n\n"
         "🔧 📋 የሚገኙ ትዕዛዞች:\n\n"
         "🍽 /menu - የሳምንቱን ምግብ ዝርዝር ይመልከቱ\n\n"
         "🛒 /subscribe - የምዝገባ እቅድ ይምረጡ\n\n"
@@ -422,7 +494,7 @@ async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/admin_announce - ማስታወቂያዎችን ይላኩ\n\n"
             "/setadminlocation - የካፌ ቦታ ያዘጋጁ\n\n"
             "/viewlocations - የተጋሩ ቦታዎችን ይመልከቱ\n\n"
-            "/admin_approve_locations - ተጠባቂ ቦታዎችን ያረጋግጡ"
+            "/admin_approve_locations - ተጠባቂ ቦታዎችን ያረጋጋጡ"
         )
     await update.message.reply_text(commands_text, reply_markup=get_main_keyboard(user.id))
 
@@ -1456,7 +1528,6 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         valid_days_am = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
         selected_dates = [valid_days_am[valid_days_en.index(day)] for day in selected_dates_en]
-        # Fetch subscription
         # Fetch current menu
         today = datetime.now(EAT).date()
         week_start = today - timedelta(days=today.weekday())
@@ -1735,7 +1806,7 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
-    if update.message.text == 'ሰርዝ' or update.message.text == '🔙 ተመለስ':
+    if update.message.text in ['ሰርዝ', '🔙 ተመለስ']:
         context.user_data.clear()
         await update.message.reply_text(
             "❌ የምግብ ምርጫ ተሰርዟል።\n\n"
@@ -1953,232 +2024,6 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
-# Admin: Generate Report as PDF
-async def admin_generate_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-
-    await update.message.reply_text("📊 ሪፖርት በመጋን ላይ... ⏳", reply_markup=ReplyKeyboardRemove())
-
-    conn = None
-    cur = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-
-        # Fetch users with active subscriptions
-        cur.execute("""
-            SELECT telegram_id, full_name, phone_number, location, created_at
-            FROM public.users u
-            WHERE EXISTS (
-                SELECT 1 FROM public.subscriptions s 
-                WHERE s.user_id = u.telegram_id AND s.status IN ('pending', 'active')
-            )
-            ORDER BY u.created_at
-        """)
-        user_rows = cur.fetchall()
-
-        # Group data by user
-        users_data = {}
-        for row in user_rows:
-            telegram_id = row[0]
-            users_data[telegram_id] = {
-                'full_name': row[1] or 'N/A',
-                'phone_number': row[2] or 'N/A',
-                'location': row[3] or 'N/A',
-                'created_at': str(row[4]),
-                'subscriptions': [],
-                'payments': [],
-                'orders': []
-            }
-
-        # Fetch subscriptions for each user
-        for telegram_id in users_data:
-            cur.execute("""
-                SELECT id, plan_type, meals_remaining, selected_dates, expiry_date, status, created_at
-                FROM public.subscriptions 
-                WHERE user_id = %s AND status IN ('pending', 'active')
-            """, (telegram_id,))
-            sub_rows = cur.fetchall()
-            for sub_row in sub_rows:
-                selected_dates_list = json.loads(sub_row[3]) if sub_row[3] else []
-                users_data[telegram_id]['subscriptions'].append({
-                    'sub_id': str(sub_row[0]),
-                    'plan_type': sub_row[1],
-                    'meals_remaining': str(sub_row[2]),
-                    'selected_dates': selected_dates_list,
-                    'expiry_date': str(sub_row[4]),
-                    'status': sub_row[5],
-                    'created_at': str(sub_row[6])
-                })
-
-        # Fetch payments for each user
-        for telegram_id in users_data:
-            cur.execute("""
-                SELECT p.id, p.amount, p.receipt_url, p.status, p.created_at
-                FROM public.payments p
-                JOIN public.subscriptions s ON p.subscription_id = s.id
-                WHERE s.user_id = %s
-            """, (telegram_id,))
-            pay_rows = cur.fetchall()
-            for pay_row in pay_rows:
-                users_data[telegram_id]['payments'].append({
-                    'pay_id': str(pay_row[0]),
-                    'amount': pay_row[1],
-                    'receipt_url': pay_row[2],
-                    'status': pay_row[3],
-                    'created_at': str(pay_row[4])
-                })
-
-        # Fetch orders for each user
-        for telegram_id in users_data:
-            cur.execute("""
-                SELECT id, meal_date, items, status
-                FROM public.orders o
-                JOIN public.subscriptions s ON o.subscription_id = s.id
-                WHERE s.user_id = %s
-            """, (telegram_id,))
-            ord_rows = cur.fetchall()
-            for ord_row in ord_rows:
-                items = json.loads(ord_row[2]) if isinstance(ord_row[2], str) else ord_row[2]
-                users_data[telegram_id]['orders'].append({
-                    'ord_id': str(ord_row[0]),
-                    'meal_date': str(ord_row[1]),
-                    'items': items,
-                    'status': ord_row[3]
-                })
-
-        # Generate PDF
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter)
-        story = []
-        styles = getSampleStyleSheet()
-
-        # Register font for Amharic support if available
-        try:
-            pdfmetrics.registerFont(TTFont('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'))
-            for style in styles:
-                if hasattr(styles[style], 'fontName'):
-                    styles[style].fontName = 'DejaVuSans'
-        except:
-            logger.warning("Amharic font not available, using default.")
-
-        # Title
-        title = Paragraph("የኦዝ ኪችን ሪፖርት - ተመዝጋቢዎች, ትዕዛዞች እና ክፍያዎች", styles['Title'])
-        story.append(title)
-        story.append(Spacer(1, 12))
-
-        # Date
-        current_date = datetime.now(EAT).strftime('%Y-%m-%d %H:%M')
-        date_para = Paragraph(f"ቀን: {current_date}", styles['Normal'])
-        story.append(date_para)
-        story.append(Spacer(1, 24))
-
-        for user_id, user_info in users_data.items():
-            # User Header
-            user_header = Paragraph(f"<b>ተጠቃሚ ID: {user_id}</b><br/>ስም: {user_info['full_name']}<br/>ስልክ: {user_info['phone_number']}<br/>ቦታ: {user_info['location']}<br/>የመመዝገቢያ ቀን: {user_info['created_at']}", styles['Normal'])
-            story.append(user_header)
-            story.append(Spacer(1, 12))
-
-            # Subscriptions Table
-            if user_info['subscriptions']:
-                sub_data = [['ኢድ', 'እቅድ', 'ቀሪ ምግቦች', 'ቀናት', 'ጫና', 'ሁኔታ', 'ቀን']]
-                for sub in user_info['subscriptions']:
-                    dates_str = ', '.join(sub['selected_dates'])
-                    sub_data.append([sub['sub_id'], sub['plan_type'], sub['meals_remaining'], dates_str, sub['expiry_date'], sub['status'], sub['created_at']])
-                sub_table = Table(sub_data)
-                sub_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 12),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                ]))
-                story.append(Paragraph("የምዝገባ ዝርዝር:", styles['Heading2']))
-                story.append(sub_table)
-                story.append(Spacer(1, 12))
-            else:
-                story.append(Paragraph("የምዝገባዎች: የሉም", styles['Normal']))
-                story.append(Spacer(1, 12))
-
-            # Payments Table
-            if user_info['payments']:
-                pay_data = [['ኢድ', 'መጠን', 'ማረጋገጫ URL', 'ሁኔታ', 'ቀን']]
-                for pay in user_info['payments']:
-                    pay_data.append([pay['pay_id'], f"{pay['amount']:.2f} ብር", pay['receipt_url'] or 'N/A', pay['status'], pay['created_at']])
-                pay_table = Table(pay_data)
-                pay_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 12),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.lightblue),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                ]))
-                story.append(Paragraph("የክፍያ ዝርዝር:", styles['Heading2']))
-                story.append(pay_table)
-                story.append(Spacer(1, 12))
-            else:
-                story.append(Paragraph("የክፍያዎች: የሉም", styles['Normal']))
-                story.append(Spacer(1, 12))
-
-            # Orders Table
-            if user_info['orders']:
-                ord_data = [['ኢድ', 'ቀን', 'ምግቦች', 'ሁኔታ']]
-                for ord in user_info['orders']:
-                    items_str = ', '.join([item['name'] for item in ord['items']])
-                    ord_data.append([ord['ord_id'], ord['meal_date'], items_str, ord['status']])
-                ord_table = Table(ord_data)
-                ord_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 12),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                    ('BACKGROUND', (0, 1), (-1, -1), colors.lightgreen),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
-                ]))
-                story.append(Paragraph("የትዕዛዝ ዝርዝር:", styles['Heading2']))
-                story.append(ord_table)
-                story.append(Spacer(1, 12))
-            else:
-                story.append(Paragraph("ትዕዛዞች: የሉም", styles['Normal']))
-                story.append(Spacer(1, 12))
-
-            story.append(PageBreak())
-
-        # Build PDF
-        doc.build(story)
-        buffer.seek(0)
-
-        # Send PDF
-        await context.bot.send_document(
-            chat_id=user.id,
-            document=buffer,
-            filename=f"oz_kitchen_report_{current_date}.pdf",
-            caption="📊 ሙሉ ሪፖርት (ተመዝጋቢዎች, ትዕዛዞች እና ክፍያዎች)"
-        )
-
-        await update.message.reply_text("✅ ሪፖርት ተላከ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    except Exception as e:
-        logger.error(f"Error generating report: {e}")
-        await update.message.reply_text("❌ ሪፖርት በመጋን ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
 # Admin: Approve or reject location
 async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -2252,7 +2097,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
         )
         location = cur.fetchone()
         if not location:
-            await query.edit_message_text("❌ ቦታ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
+            await query.message.reply_text("❌ ቦታ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
             return
         user_id, location_text = location
         if action == 'approve':
@@ -2265,7 +2110,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
                 (location_text, user_id)
             )
             conn.commit()
-            await query.edit_message_text("✅ ቦታ ተቀበለ።\n\n🚀 ተቀበለ!")
+            await query.message.reply_text("✅ ቦታ ተቀበለ።\n\n🚀 ተቀበለ!")
             # Send direct to subscription plan
             await context.bot.send_message(
                 chat_id=user_id,
@@ -2285,7 +2130,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
                 (location_id,)
             )
             conn.commit()
-            await query.edit_message_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
+            await query.message.reply_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
             await context.bot.send_message(
                 chat_id=user_id,
                 text="❌ ቦታዎ ተሰርዟል።\n\n"
@@ -2295,7 +2140,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
             )
     except Exception as e:
         logger.error(f"Error processing location callback for location {location_id}: {e}")
-        await query.edit_message_text("❌ የቦታ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
+        await query.message.reply_text("❌ የቦታ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
     finally:
         if cur:
             cur.close()
@@ -2351,8 +2196,8 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                             text=f"💳 ክፍያ #{payment_id}\n\n"
                                  f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
                                  f"💰 መጠን: {amount:.2f} ብር\n\n"
-                                 f"🔗 የማረጋገጫ URL: {receipt_url}\n\n"
-                                 f"(⚠️ ማሳወቁያ: ስቶ ማሳየት ስህተት ተከሰተ: {str(e)})\n\n"
+                                 f"🔗 የስምልጣ URL: {receipt_url}\n\n"
+                                 f"(⚠️ ማሳወቁ: ስቶ ማሳየት ስህተት ተከሰተ: {str(e)})\n\n"
                                  "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                             reply_markup=reply_markup
                         )
@@ -2362,7 +2207,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                         text=f"💳 ክፍያ #{payment_id}\n\n"
                              f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
                              f"💰 መጠን: {amount:.2f} ብር\n\n"
-                             f"🔗 የማረጋገጫ URL: {receipt_url or 'የለም'} (የማይሰራ ወይም የለም URL)\n\n"
+                             f"🔗 የስምልጣ URL: {receipt_url or 'የለም'} (የማይሰራ ወይም የለም URL)\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=reply_markup
                     )
@@ -2378,7 +2223,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                     reply_markup=reply_markup
                 )
         await update.message.reply_text(
-            "💳 📭 ከላይ የቆዩ የክፍያ ጥያቄዎች ናቸው።\n\n"
+            "💳 📷 ከላይ የቆዩ የክፍያ ጥያቄዎች ናቸው።\n\n"
             "🔧 ለማረጋገጥ ወይም ለመሰረዝ አማራጮቹን ይጠቀሙ።\n\n"
             "🚀 እርምጃ ይወስዱ!",
             reply_markup=get_main_keyboard(user.id)
@@ -2413,7 +2258,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         )
         payment = cur.fetchone()
         if not payment:
-            await query.edit_message_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
+            await query.message.reply_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
             return
         user_id, subscription_id, amount = payment
         if action == 'approve':
@@ -2426,7 +2271,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 (subscription_id,)
             )
             conn.commit()
-            await query.edit_message_text("✅ ክፍያ ተቀበለ።\n\n🚀 ተቀበለ!")
+            await query.message.reply_text("✅ ክፍያ ተቀበለ።\n\n🚀 ተቀበለ!")
             # Fetch orders for detailed message
             cur.execute(
                 "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
@@ -2435,7 +2280,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             orders = cur.fetchall()
             detailed_text = f"📢 የክፍያ ማረጋገጫ መልእክት!\n\n"
             detailed_text += f"✅ ክፍያዎ {amount:.2f} ብር ተቀበለ!\n\n"
-            detailed_text += "🍽 የተመረጡ ምግቦችና ቀናት:\n\n"
+            detailed_text += "🍽 የተመረጡ ምግቦችና ቀን:\n\n"
             for meal_date, items_json in orders:
                 items = json.loads(items_json) if isinstance(items_json, str) else items_json
                 detailed_text += f"{meal_date}: "
@@ -2449,7 +2294,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 text=detailed_text
             )
             # Send help text
-            fake_update = Update(0, message=type('obj', (object,), {'effective_user': type('obj', (object,), {'id': user_id})})())
+            fake_update = Update(0, message=type('obj', (object,), {'effective_user': type('obj', (object,), {'id': user_id})}))
             await send_help_text(fake_update, context)
         elif action == 'reject':
             cur.execute(
@@ -2465,7 +2310,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 (subscription_id,)
             )
             conn.commit()
-            await query.edit_message_text("❌ ክፍያ ተውደቀ።\n\n🚫 ተውደቀ!")
+            await query.message.reply_text("❌ ክፍያ ተውደቀ።\n\n🚫 ተውደቀ!")
             await context.bot.send_message(
                 chat_id=user_id,
                 text="❌ ክፍያዎ ተሰርዟል።\n\n"
@@ -2475,7 +2320,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             )
     except Exception as e:
         logger.error(f"Error processing payment callback for payment {payment_id}: {e}")
-        await query.edit_message_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
+        await query.message.reply_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
     finally:
         if cur:
             cur.close()
@@ -2554,7 +2399,7 @@ async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         await update.message.reply_text("❌ የምግብ ዝርዝር ማዘመን ተሰርዟል።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
@@ -2615,7 +2460,7 @@ async def admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = build_delete_menu_text(menu_items, week_start)
         await update.message.reply_text(
             f"{text}\n\n"
-            "🔢 ለማስወገድ ንጥል ቁጥር ያስገቡ (ለምሳሌ: '1') ወይም 'ሰርዝ' ይጻፉ።\n\n"
+            "🔢 ለማስወገድ ነጠላ ቁጥር ያስገቡ (ለምሳሌ: '1') ወይም 'ሰርዝ' ይጻፉ።\n\n"
             "🚀 ንጥል ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
         )
@@ -2815,7 +2660,7 @@ async def admin_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📢 ለሁሉም ተጠቃሚዎች ለማስተላለፍ መልእክት ያስገቡ:\n\n"
         "🔧 መልእክት ያስገቡ!\n\n"
-        "🚀 ማስተወሻ ያልፉ!",
+        "🚀 ማስታወቂያ ያልፉ!",
         reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
     )
     return ADMIN_ANNOUNCE
@@ -2826,7 +2671,7 @@ async def process_admin_announce(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
-        await update.message.reply_text("❌ ማስተወሻ ተሰርዟል።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ ማስታወቂያ ተሰርዟል።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     announcement = update.message.text
     conn = None
@@ -2836,19 +2681,19 @@ async def process_admin_announce(update: Update, context: ContextTypes.DEFAULT_T
         cur = conn.cursor()
         cur.execute("SELECT telegram_id FROM public.users")
         users = cur.fetchall()
-        for (user_id,) in users:
+        for user_id, in users:
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
-                    text=f"📢 ማስተወሻ:\n\n{announcement}\n\n🚀 በደህና ይጠቀሙ!"
+                    text=f"📢 ማስታወቂያ:\n\n{announcement}\n\n🚀 በደህና ይጠቀሙ!"
                 )
             except Exception as e:
                 logger.error(f"Error sending announcement to user {user_id}: {e}")
-        await update.message.reply_text("✅ ማስተወሻ ለሁሉም ተጠቃሚዎች ተላከ።\n\n🚀 ተላከ!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("✅ ማስታወቂያ ለሁሉም ተጠቃሚዎች ተላከ።\n\n🚀 ተላከ!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error sending announcement: {e}")
-        await update.message.reply_text("❌ ማስተወሻ በማላክ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ ማስታወቂያ በማላክ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
         return ADMIN_ANNOUNCE
     finally:
         if cur:
@@ -2921,7 +2766,7 @@ async def process_set_admin_location(update: Update, context: ContextTypes.DEFAU
 async def view_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -2986,7 +2831,7 @@ async def send_lunch_reminders(context: ContextTypes.DEFAULT_TYPE):
             for item in items:
                 message += f"🍴 {item['name']} - {item['price']:.2f} ብር\n"
             message += f"💰 ጠቅላላ ክፍያ: {total_amount or 'የለም'} ብር\n\n"
-            message += "🚀 በደህና በታቹ ይጠቀሙ!"
+            message += "🚀 በደህና በታትተው ይጠቀሙ!"
             try:
                 await context.bot.send_message(chat_id=user_id, text=message)
             except Exception as e:
@@ -3022,7 +2867,7 @@ async def send_dinner_reminders(context: ContextTypes.DEFAULT_TYPE):
             for item in items:
                 message += f"🍴 {item['name']} - {item['price']:.2f} ብር\n"
             message += f"💰 ጠቅላላ ክፍያ: {total_amount or 'የለም'} ብር\n\n"
-            message += "🚀 በደህና በታቹ ይጠቀሙ!"
+            message += "🚀 በደህና በታትተው ይጠቀሙ!"
             try:
                 await context.bot.send_message(chat_id=user_id, text=message)
             except Exception as e:
@@ -3090,6 +2935,7 @@ def main():
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
                     MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), user_profile),
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
+                    MessageHandler(filters.Regex('^🖨 Print Order$'), print_order),
                     MessageHandler(filters.Regex('^🔄 ትዕዛዙን መዘዋወር$'), reschedule_start),
                     MessageHandler(filters.Regex('^📞 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር አዘምን$'), admin_update_menu),
@@ -3102,7 +2948,6 @@ def main():
                     MessageHandler(filters.Regex('^🔐 ቦታ አዘጋጅ$'), set_admin_location),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን ተመልከት$'), view_locations),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን አረጋግጥ$'), admin_approve_locations),
-                    MessageHandler(filters.Regex('^🔐 ሪፖርት ማተም$'), admin_generate_report),
                     MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^⏳ ማረጋገጫ በመጠበቅ ላይ$'), lambda u, c: MAIN_MENU),  # Restricted
@@ -3154,6 +2999,9 @@ def main():
                 SUPPORT_MENU: [
                     MessageHandler(filters.Regex('^🔙 ተመለስ$'), back_to_main)
                 ],
+                PRINT_ORDER: [
+                    MessageHandler(filters.Regex('^🖨 Print Order$'), print_order)
+                ],
             },
             fallbacks=[CommandHandler('cancel', cancel)],
             allow_reentry=True
@@ -3173,6 +3021,10 @@ def main():
                 sleep(10)
     except Exception as e:
         logger.error(f"Error starting bot: {e}")
+
+
+
+
 
 if __name__ == '__main__':
     main()
