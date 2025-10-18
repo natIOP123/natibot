@@ -1637,7 +1637,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             if menu_shown:
                 next_prompt = (
                     f"📅 ለ{next_day} ምግብ ቁጥር ያስገቡ (1-{len(menu_items)}):\n\n"
-                    f"🚫 ለመሰረዝ 'ሰር��' ይፃፉ።"
+                    f"🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
                 )
             else:
                 fasting_items = [item for item in menu_items if item['category'] == 'fasting']
@@ -1723,7 +1723,7 @@ async def confirm_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text(
         order_text,
         reply_markup=ReplyKeyboardMarkup(
-            [['✅ የምግብ ዝርዝሩ ትክክል ነው', '⛔ አስተካክል'], ['ሰርዝ', '🔙 ተመለስ']],
+            [['✅ የምግብ ዝርዝሩ ትክክል ነዋ', '⛔ አስተካክል'], ['ሰርዝ', '🔙 ተመለስ']],
             resize_keyboard=True
         )
     )
@@ -1997,7 +1997,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             amharic_style = styles['Normal']
 
         story = []
-        title = Paragraph("Oz Kitchen Orders Report", styles['Title'])
+        title = Paragraph("Oz Kitchen Orders Report / የኦዝ ኪችን ትዕዛዞች ሪፖርት", styles['Title'])
         story.append(title)
         story.append(Spacer(1, 0.5 * inch))
 
@@ -2035,38 +2035,38 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             orders = cur.fetchall()
 
             # User header
-            header_text = f"<b>User:</b> {full_name or 'N/A'} (ID: {telegram_id})<br/><b>Phone:</b> {phone_number or 'N/A'} | <b>Location:</b> {location or 'N/A'} | <b>Joined:</b> {user_created.strftime('%Y-%m-%d')}<br/><b>Subscription:</b> {plan_type} | <b>Meals Left:</b> {meals_remaining} | <b>Expiry:</b> {expiry_date.strftime('%Y-%m-%d')} | <b>Status:</b> {sub_status}"
+            header_text = f"<b>User / ተጠቃሚ:</b> {full_name or 'N/A / የለም'} (ID: {telegram_id})<br/><b>Phone / ስልክ:</b> {phone_number or 'N/A / የለም'} | <b>Location / ቦታ:</b> {location or 'N/A / የለም'} | <b>Joined / ተመዝግቧል:</b> {user_created.strftime('%Y-%m-%d')}<br/><b>Subscription / ምዝገባ:</b> {plan_type} | <b>Meals Left / ቀሪ ምግቦች:</b> {meals_remaining} | <b>Expiry / ጫና:</b> {expiry_date.strftime('%Y-%m-%d')} | <b>Status / ሁኔታ:</b> {sub_status}"
             p_header = Paragraph(header_text, amharic_style)
             story.append(p_header)
             story.append(Spacer(1, 0.2 * inch))
 
             # Payments
-            payments_text = "<b>Payments:</b><br/>"
+            payments_text = "<b>Payments / ክፍያዎች:</b><br/>"
             if payments:
                 for amount, paid_date, status in payments:
-                    payments_text += f"  - Amount: {amount} ETB | Date Paid: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status: {status}<br/>"
+                    payments_text += f"  - Amount / መጠን: {amount} ETB / ብር | Date Paid / የተጠፉ ቀን: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status / ሁኔታ: {status}<br/>"
             else:
-                payments_text += "None"
+                payments_text += "None / የሉም"
             p_payments = Paragraph(payments_text, amharic_style)
             story.append(p_payments)
             story.append(Spacer(1, 0.2 * inch))
 
             # Selected Dates
-            dates_text = f"<b>Selected Dates:</b> {', '.join(selected_dates)}"
+            dates_text = f"<b>Selected Dates / የተመረጡ ቀናት:</b> {', '.join(selected_dates)}"
             p_dates = Paragraph(dates_text, amharic_style)
             story.append(p_dates)
             story.append(Spacer(1, 0.2 * inch))
 
             # Orders
-            orders_text = "<b>Food Ordered:</b><br/>"
+            orders_text = "<b>Food Ordered / የተቆጠሩ ምግቦች:</b><br/>"
             if orders:
                 for meal_date, items_json in orders:
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                    orders_text += f"  - Date: {meal_date}<br/>"
+                    orders_text += f"  - Date / ቀን: {meal_date}<br/>"
                     for item in items:
-                        orders_text += f"    * {item['name']} ({item['price']} ETB, Category: {item['category']})<br/>"
+                        orders_text += f"    * {item['name']} ({item['price']} ETB / ብር, Category / መደብ: {item['category']})<br/>"
             else:
-                orders_text += "None"
+                orders_text += "None / የሉም"
             p_orders = Paragraph(orders_text, amharic_style)
             story.append(p_orders)
 
@@ -2174,7 +2174,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
         )
         location = cur.fetchone()
         if not location:
-            await query.message.reply_text("❌ ቦታ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
+            await query.edit_message_text("❌ ቦታ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
             return
         user_id, location_text = location
         if action == 'approve':
@@ -2187,7 +2187,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
                 (location_text, user_id)
             )
             conn.commit()
-            await query.message.reply_text("✅ ቦታ ተቀበለ።\n\n🚀 ተቀበለ!")
+            await query.edit_message_text("✅ ቦታ ተቀበለ።\n\n🚀 ተቀበለ!")
             # Send direct to subscription plan
             await context.bot.send_message(
                 chat_id=user_id,
@@ -2207,7 +2207,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
                 (location_id,)
             )
             conn.commit()
-            await query.message.reply_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
+            await query.edit_message_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
             await context.bot.send_message(
                 chat_id=user_id,
                 text="❌ ቦታዎ ተሰርዟል።\n\n"
@@ -2217,7 +2217,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
             )
     except Exception as e:
         logger.error(f"Error processing location callback for location {location_id}: {e}")
-        await query.message.reply_text("❌ የቦታ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
+        await query.edit_message_text("❌ የቦታ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
     finally:
         if cur:
             cur.close()
@@ -2335,7 +2335,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         )
         payment = cur.fetchone()
         if not payment:
-            await query.message.reply_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
+            await query.edit_message_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
             return
         user_id, subscription_id, amount = payment
         if action == 'approve':
@@ -2348,7 +2348,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 (subscription_id,)
             )
             conn.commit()
-            await query.message.reply_text("✅ ክፍያ ተቀበለ።\n\n🚀 ተቀበለ!")
+            await query.edit_message_text("✅ ክፍያ ተቀበለ።\n\n🚀 ተቀበለ!")
             # Fetch orders for detailed message
             cur.execute(
                 "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
@@ -2387,7 +2387,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 (subscription_id,)
             )
             conn.commit()
-            await query.message.reply_text("❌ ክፍያ ተውደቀ።\n\n🚫 ተውደቀ!")
+            await query.edit_message_text("❌ ክፍያ ተውደቀ።\n\n🚫 ተውደቀ!")
             await context.bot.send_message(
                 chat_id=user_id,
                 text="❌ ክፍያዎ ተሰርዟል።\n\n"
@@ -2397,7 +2397,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             )
     except Exception as e:
         logger.error(f"Error processing payment callback for payment {payment_id}: {e}")
-        await query.message.reply_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
+        await query.edit_message_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
     finally:
         if cur:
             cur.close()
@@ -2735,7 +2735,7 @@ async def admin_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     await update.message.reply_text(
-        "📢 ለሁሉም ተጠቃሚዎች ለማስተላለፍ መልእክት ያስገቡ:\n\n"
+        "📢 ለሁሉም ተጠቃሚዎች ለማስተላለፍ መልእክቹ ያስገቡ:\n\n"
         "🔧 መልእክት ያስገቡ!\n\n"
         "🚀 ማስታወቂያ ያልፉ!",
         reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
@@ -2843,7 +2843,7 @@ async def view_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return MAIN_MENU
         for key, value in locations:
             admin_id = key.replace('admin_location_', '')
-            await update.message.reply_text(f"📍 አስተዳዳሪ {admin_id}: {value}\n\n🔧 ቦታ ተመልክቷል!")
+            await update.message.reply_text(f"📍 አስተዳዳሪ {admin_id}: {value}\n\n🔧 ቦታ ተመልክቱ!")
             if value.startswith('(') and ',' in value:
                 try:
                     match = re.match(r'\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)', value)
