@@ -16,6 +16,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 # Enable logging
 logging.basicConfig(
@@ -1965,60 +1967,85 @@ async def admin_generate_report(update: Update, context: ContextTypes.DEFAULT_TY
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # Fetch all subscribed users with details
+        # Fetch users with active subscriptions
         cur.execute("""
-            SELECT DISTINCT u.telegram_id, u.full_name, u.phone_number, u.location, u.created_at,
-                   s.id as sub_id, s.plan_type, s.meals_remaining, s.selected_dates, s.expiry_date, s.status as sub_status, s.created_at as sub_created,
-                   p.id as pay_id, p.amount, p.receipt_url, p.status as pay_status, p.created_at as pay_created,
-                   o.id as ord_id, o.meal_date, o.items, o.status as ord_status
+            SELECT telegram_id, full_name, phone_number, location, created_at
             FROM public.users u
-            LEFT JOIN public.subscriptions s ON u.telegram_id = s.user_id
-            LEFT JOIN public.payments p ON s.id = p.subscription_id
-            LEFT JOIN public.orders o ON s.id = o.subscription_id
-            WHERE s.status IN ('pending', 'active')
+            WHERE EXISTS (
+                SELECT 1 FROM public.subscriptions s 
+                WHERE s.user_id = u.telegram_id AND s.status IN ('pending', 'active')
+            )
             ORDER BY u.created_at
         """)
-        data = cur.fetchall()
+        user_rows = cur.fetchall()
 
         # Group data by user
         users_data = {}
-        for row in data:
+        for row in user_rows:
             telegram_id = row[0]
-            if telegram_id not in users_data:
-                users_data[telegram_id] = {
-                    'full_name': row[1] or 'N/A',
-                    'phone_number': row[2] or 'N/A',
-                    'location': row[3] or 'N/A',
-                    'created_at': row[4],
-                    'subscriptions': [],
-                    'payments': [],
-                    'orders': []
-                }
-            if row[5]:  # subscription_id
+            users_data[telegram_id] = {
+                'full_name': row[1] or 'N/A',
+                'phone_number': row[2] or 'N/A',
+                'location': row[3] or 'N/A',
+                'created_at': row[4],
+                'subscriptions': [],
+                'payments': [],
+                'orders': []
+            }
+
+        # Fetch subscriptions for each user
+        for telegram_id in users_data:
+            cur.execute("""
+                SELECT id, plan_type, meals_remaining, selected_dates, expiry_date, status, created_at
+                FROM public.subscriptions 
+                WHERE user_id = %s AND status IN ('pending', 'active')
+            """, (telegram_id,))
+            sub_rows = cur.fetchall()
+            for sub_row in sub_rows:
                 users_data[telegram_id]['subscriptions'].append({
-                    'sub_id': row[5],
-                    'plan_type': row[6],
-                    'meals_remaining': row[7],
-                    'selected_dates': json.loads(row[8]) if row[8] else [],
-                    'expiry_date': row[9],
-                    'status': row[10],
-                    'created_at': row[11]
+                    'sub_id': sub_row[0],
+                    'plan_type': sub_row[1],
+                    'meals_remaining': sub_row[2],
+                    'selected_dates': json.loads(sub_row[3]) if sub_row[3] else [],
+                    'expiry_date': sub_row[4],
+                    'status': sub_row[5],
+                    'created_at': sub_row[6]
                 })
-            if row[12]:  # payment_id
+
+        # Fetch payments for each user
+        for telegram_id in users_data:
+            cur.execute("""
+                SELECT p.id, p.amount, p.receipt_url, p.status, p.created_at
+                FROM public.payments p
+                JOIN public.subscriptions s ON p.subscription_id = s.id
+                WHERE s.user_id = %s
+            """, (telegram_id,))
+            pay_rows = cur.fetchall()
+            for pay_row in pay_rows:
                 users_data[telegram_id]['payments'].append({
-                    'pay_id': row[12],
-                    'amount': row[13],
-                    'receipt_url': row[14],
-                    'status': row[15],
-                    'created_at': row[16]
+                    'pay_id': pay_row[0],
+                    'amount': pay_row[1],
+                    'receipt_url': pay_row[2],
+                    'status': pay_row[3],
+                    'created_at': pay_row[4]
                 })
-            if row[17]:  # order_id
-                items = json.loads(row[19]) if row[19] else []
+
+        # Fetch orders for each user
+        for telegram_id in users_data:
+            cur.execute("""
+                SELECT id, meal_date, items, status
+                FROM public.orders o
+                JOIN public.subscriptions s ON o.subscription_id = s.id
+                WHERE s.user_id = %s
+            """, (telegram_id,))
+            ord_rows = cur.fetchall()
+            for ord_row in ord_rows:
+                items = json.loads(ord_row[2]) if ord_row[2] else []
                 users_data[telegram_id]['orders'].append({
-                    'ord_id': row[17],
-                    'meal_date': row[18],
+                    'ord_id': ord_row[0],
+                    'meal_date': ord_row[1],
                     'items': items,
-                    'status': row[20]
+                    'status': ord_row[3]
                 })
 
         # Generate PDF
@@ -2026,6 +2053,15 @@ async def admin_generate_report(update: Update, context: ContextTypes.DEFAULT_TY
         doc = SimpleDocTemplate(buffer, pagesize=letter)
         story = []
         styles = getSampleStyleSheet()
+
+        # Register font for Amharic support if available
+        try:
+            pdfmetrics.registerFont(TTFont('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'))
+            for style in styles:
+                if hasattr(styles[style], 'fontName'):
+                    styles[style].fontName = 'DejaVuSans'
+        except:
+            logger.warning("Amharic font not available, using default.")
 
         # Title
         title = Paragraph("የኦዝ ኪችን ሪፖርት - ተመዝጋቢዎች, ትዕዛዞች እና ክፍያዎች", styles['Title'])
@@ -2064,6 +2100,9 @@ async def admin_generate_report(update: Update, context: ContextTypes.DEFAULT_TY
                 story.append(Paragraph("የምዝገባ ዝርዝር:", styles['Heading2']))
                 story.append(sub_table)
                 story.append(Spacer(1, 12))
+            else:
+                story.append(Paragraph("የምዝገባዎች: የሉም", styles['Normal']))
+                story.append(Spacer(1, 12))
 
             # Payments Table
             if user_info['payments']:
@@ -2083,6 +2122,9 @@ async def admin_generate_report(update: Update, context: ContextTypes.DEFAULT_TY
                 ]))
                 story.append(Paragraph("የክፍያ ዝርዝር:", styles['Heading2']))
                 story.append(pay_table)
+                story.append(Spacer(1, 12))
+            else:
+                story.append(Paragraph("የክፍያዎች: የሉም", styles['Normal']))
                 story.append(Spacer(1, 12))
 
             # Orders Table
@@ -2104,10 +2146,10 @@ async def admin_generate_report(update: Update, context: ContextTypes.DEFAULT_TY
                 ]))
                 story.append(Paragraph("የትዕዛዝ ዝርዝር:", styles['Heading2']))
                 story.append(ord_table)
-                story.append(Spacer(1, 24))
+                story.append(Spacer(1, 12))
             else:
                 story.append(Paragraph("ትዕዛዞች: የሉም", styles['Normal']))
-                story.append(Spacer(1, 24))
+                story.append(Spacer(1, 12))
 
             story.append(PageBreak())
 
