@@ -660,8 +660,11 @@ async def reschedule_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, ord in enumerate(eligible_orders, 1):
             meal_d = ord['meal_date'].strftime('%Y-%m-%d')
             plan_am = 'ምሳ' if ord['plan_type'] == 'lunch' else 'እራት'
-            items_names = ', '.join([item['name'] for item in ord['items']])
-            text += f"{idx}. {meal_d} ({plan_am}): {items_names}\n\n"
+            items_details = []
+            for item in ord['items']:
+                items_details.append(f"{item['name']} ({item['price']:.2f} ብር)")
+            items_text = '\n'.join(items_details)
+            text += f"{idx}. {meal_d} ({plan_am}):\n{items_text}\n\n"
         text += "🔢 ለማዘዋወር ቁጥር ያስገቡ።"
         context.user_data['eligible_orders'] = eligible_orders
         await update.message.reply_text(
@@ -796,11 +799,14 @@ async def reschedule_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Confirm
     old_date_str = selected_order['meal_date'].strftime('%Y-%m-%d')
     plan_am = 'ምሳ' if selected_order['plan_type'] == 'lunch' else 'እራት'
-    items_names = ', '.join([item['name'] for item in selected_order['items']])
+    items_details = []
+    for item in selected_order['items']:
+        items_details.append(f"{item['name']} ({item['price']:.2f} ብር)")
+    items_text = '\n'.join(items_details)
     confirm_text = (
         f"🔄 ማዘዋወር ማረጋገጫ:\n\n"
         f"ከ {old_date_str} ({plan_am}) ወደ {new_date}\n\n"
-        f"🍴 {items_names}\n\n"
+        f"🍴 የተመረጡ ምግቦች:\n{items_text}\n\n"
         "✅ ያረጋግጡ?"
     )
     keyboard = [['✅ አረጋግጥ', '⛔ ሰርዝ'], ['🔙 ተመለስ']]
@@ -1948,7 +1954,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.error(f"Error sending photo to admin {admin_id} for payment {payment_id}: {e}")
                     await context.bot.send_message(
                         chat_id=admin_id,
-                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
+                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ��ፋ {total_price:.2f} ብር።\n\n"
                              f"⚠️ የማረጋጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
                              f"🔗 የማረጋጫ URL: {receipt_url}\n\n"
                              "🔧 ለማረጋጥ ወይም ለመሰረዝ ይመርጡ!",
@@ -1983,7 +1989,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error processing payment for user {user.id}: {e}")
         await update.message.reply_text(
-            "❌ ማረጋገጫ በማስገባት ላይ ስህተት።\n\n"
+            "❌ ማረጋገገጫ በማስገባት ላይ ስህተት።\n\n"
             "🔄 እባክዎ እንደገና ይሞክሩ።",
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
         )
@@ -2129,7 +2135,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
                     orders_text += f"  - Date Ordered: {meal_date} (Order Date: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
                     for item in items:
-                        orders_text += f"    * {item['name']} ------- {total_paid:.2f} ETB<br/>"
+                        orders_text += f"    * {item['name']} ------- {item['price']:.2f} ETB<br/>"
             else:
                 orders_text += "None"
             p_orders = Paragraph(orders_text, amharic_style)  # Use Amharic style for food names
@@ -2716,7 +2722,7 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         payments = cur.fetchall()
         if not payments:
-            await update.message.reply_text("❌ ክፍያዎች አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ ክፍያዎች አልተገኘም።\n\n🔙 ወደ መነ�� ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
         text = "💸 የክፍያ ታሪክ:\n\n"
         for payment_id, full_name, username, amount, status, created_at in payments:
@@ -2880,7 +2886,7 @@ async def process_set_admin_location(update: Update, context: ContextTypes.DEFAU
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error setting admin location: {e}")
-        await update.message.reply_text("❌ ቦታ በማዘጋጀት ላይ ስህተት።\n\n🔄 እባክዎ እ��ደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([["ዝለል", '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ ቦታ በማዘጋጀት ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([["ዝለል", '🔙 ተመለስ']], resize_keyboard=True))
         return SET_ADMIN_LOCATION
     finally:
         if cur:
