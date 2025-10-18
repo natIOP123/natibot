@@ -416,8 +416,8 @@ async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/admin_update_menu - የሳምንቱን ምግብ ዝርዝር ያዘምኑ\n\n"
             "/admin_delete_menu - የሳምንቱን ምግብ ዝርዝር ይሰርዙ\n\n"
             "/admin_subscribers - ንቁ ተመዝጋቢዎችን ይመልከቱ\n\n"
-            "/admin_payments - ክፍያዎችን ይከታተሉ\n\n"
-            "/admin_approve_payment - ተጠባቂ ክፍያዎችን ያረጋግጡ ወይም ውድቅ ያድርጉ\n\n"
+            "/admin_payments - ክፍላዎችን ይከታተሉ\n\n"
+            "/admin_approve_payment - ተጠባቂ ክፍላዎችን ያረጋግጡ ወይም ውድቅ ያድርጉ\n\n"
             "/admin_daily_orders - የዕለት ትዕዛዝ ዝርዝር ይመልከቱ\n\n"
             "/admin_announce - ማስታወቂያዎችን ይላኩ\n\n"
             "/setadminlocation - የካፌ ቦታ ያዘጋጁ\n\n"
@@ -1343,7 +1343,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [days_to_show[i:i+3] for i in range(0, len(days_to_show), 3)]
         keyboard.append(['ጨርስ', '🔙 ተመለስ'])
         await update.message.reply_text(
-            f"✅ {choice} ታክሏል።\n\n"
+            f"✅ {choice} ተታክሏል።\n\n"
             "📅 ተጨማሪ ቀና቉ ይምረጡ ወይም 'ጨርስ' ይጫኑ።\n\n"
             "🚀 ቀናት ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -1819,7 +1819,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return MAIN_MENU
     if not update.message.photo:
         await update.message.reply_text(
-            "❌ የክፍያ ማረጋገጫ ምስል ያስገቡ።\n\n"
+            "❌ የክፍላ ማረጋገጫ ምስል ያስገቡ።\n\n"
             "📤 ምስል ያስገቡ!\n\n"
             "🔄 እባክዎ ምስል ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
@@ -1838,7 +1838,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not subscription_id or total_price <= 0:
             logger.error(f"Missing or invalid subscription_id or total_price for user {user.id}")
             await update.message.reply_text(
-                "❌ ስህተት: የመመዝገቢያዎ ወይም የክፍያ መረጃዎ አይገኝም።\n\n"
+                "❌ ስህተት: የመመዝገቢያዎ ወይም የክፋ መረጃዎ አይገኝም።\n\n"
                 "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n\n"
                 "🔄 እንደገና ይጀምሩ!",
                 reply_markup=get_main_keyboard(user.id)
@@ -1873,7 +1873,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.warning(f"Invalid receipt URL for payment {payment_id}: {receipt_url}")
                     await context.bot.send_message(
                         chat_id=admin_id,
-                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ {total_price:.2f} ብር።\n\n"
+                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
                              f"⚠️ የማረጋገጫ URL የለም: {receipt_url}\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
@@ -1886,7 +1886,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_photo(
                         chat_id=admin_id,
                         photo=receipt_url,
-                        caption=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ {total_price:.2f} ብር።\n\n"
+                        caption=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
                                 f"💳 እባክዎ ይፈትሹ።\n\n"
                                 "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
@@ -1898,7 +1898,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.error(f"Error sending photo to admin {admin_id} for payment {payment_id}: {e}")
                     await context.bot.send_message(
                         chat_id=admin_id,
-                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ {total_price:.2f} ብር።\n\n"
+                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
                              f"⚠️ የማረጋገጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
                              f"🔗 የማረጋገጫ URL: {receipt_url}\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
@@ -1923,7 +1923,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"Error notifying admin {admin_id} about new order: {e}")
         await update.message.reply_text(
-            "📤 ክፍያዎ ተልኳል።\n\n"
+            "📤 ክፋዎ ተልኳል።\n\n"
             "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
             "🚀 በትክክል ይጠብቁ!",
             reply_markup=get_main_keyboard(user.id)
@@ -2526,7 +2526,7 @@ async def admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         menu = cur.fetchone()
         if not menu:
-            await update.message.reply_text("❌ ለዚህ ሳምንት ምግብ ዝርዝር አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ ለዚህ ሳምንቹ ምግብ ዝርዝር አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
         menu_items = json.loads(menu[0]) if isinstance(menu[0], str) else menu[0]
         if not menu_items:
@@ -2888,10 +2888,10 @@ async def send_lunch_reminders(context: ContextTypes.DEFAULT_TYPE):
         for user_id, full_name, items_json, total_amount in users_data:
             items = json.loads(items_json) if isinstance(items_json, str) else items_json
             message = f"🍽 ምስጋና! {full_name or 'ተጠቃሚ'}\n\n"
-            message += "የቀን ምግብዎ ዝግጁ ሆነ!\n\n"
+            message += "የቀን ምግ���ዎ ዝግጁ ሆነ!\n\n"
             for item in items:
                 message += f"🍴 {item['name']} - {item['price']:.2f} ብር\n"
-            message += f"💰 ጠቅላላ ክፍያ: {total_amount or 'የለም'} ብር\n\n"
+            message += f"💰 ጠቅላላ ክፍላ: {total_amount or 'የለም'} ብር\n\n"
             message += "🚀 በደህና በታትተው ይጠቀሙ!"
             try:
                 await context.bot.send_message(chat_id=user_id, text=message)
@@ -2927,7 +2927,7 @@ async def send_dinner_reminders(context: ContextTypes.DEFAULT_TYPE):
             message += "የምሳ ምግብዎ ዝግጁ ሆነ!\n\n"
             for item in items:
                 message += f"🍴 {item['name']} - {item['price']:.2f} ብር\n"
-            message += f"💰 ጠቅላላ ክፍያ: {total_amount or 'የለም'} ብር\n\n"
+            message += f"💰 ጠቅላላ ክፋ: {total_amount or 'የለም'} ብር\n\n"
             message += "🚀 በደህና በታትተው ይጠቀሙ!"
             try:
                 await context.bot.send_message(chat_id=user_id, text=message)
@@ -2996,7 +2996,7 @@ def main():
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር ሰርዝ$'), admin_delete_menu),
                     MessageHandler(filters.Regex('^🔐 ተመዝጋቢዎችን ተመልከት$'), admin_subscribers),
                     MessageHandler(filters.Regex('^🔐 ክፍያዎችን ተመልከት$'), admin_payments),
-                    MessageHandler(filters.Regex('^🔐 ክፍያዎችን አረጋግጥ$'), admin_approve_payment),
+                    MessageHandler(filters.Regex('^🔐 ክፍ���ዎችን አረጋግጥ$'), admin_approve_payment),
                     MessageHandler(filters.Regex('^🔐 የዕለት ትዕዛዞች$'), admin_daily_orders),
                     MessageHandler(filters.Regex('^🔐 ማስታወቂያ$'), admin_announce),
                     MessageHandler(filters.Regex('^🔐 ቦታ አዘጋጅ$'), set_admin_location),
