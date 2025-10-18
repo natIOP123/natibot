@@ -1,4 +1,6 @@
+charset-normalizer==3.4.4
 fpdf==1.7.2
+reportlab==4.4.4
 alembic==1.16.4
 annotated-types==0.7.0
 anyio==4.10.0
