@@ -1288,7 +1288,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📜 ለ{first_day} ምግብ ይምረጡ:\n\n"
                 f"📅 የተመረጡ ቀናት: {', '.join(selected_dates)}\n\n"
                 f"🍽 ቀሪ ምግቦች: {len(selected_dates)}\n\n"
-                "🍲 የጾም ምግብ ዝርዝር:\n\n"
+                f"🍲 የጾም ምግብ ዝርዝር:\n\n"
             )
             for idx, item in enumerate(fasting_items, 1):
                 menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n\n"
@@ -1780,17 +1780,17 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup([['ጨርስ'], ['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
         )
         return MEAL_SELECTION
-    if update.message.text != '✅ የምግብ ዝርዝሩ ትክክል ነው':
+    if update.message.text != '✅ የምግብ ዝርዝሩ ትክክል ነዋ':
         await update.message.reply_text(
-            "❌ እባክዎ '✅ የምግብ ዝርዝሩ ትክክል ነው' ወይም '⛔ አስተካክል' ይምረጡ።\n\n"
+            "❌ እባክዎ '✅ የምግብ ዝርዝሩ ትክክል ነዋ' ወይም '⛔ አስተካክል' ይምረጡ።\n\n"
             "🔄 ትክክለኛ ምርጫ ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(
-                [['✅ የምግብ ዝርዝሩ ትክክል ነው', '⛔ አስተካክል'], ['ሰርዝ', '🔙 ተመለስ']],
+                [['✅ የምግብ ዝርዝሩ ትክክል ነዋ', '⛔ አስተካክል'], ['ሰርዝ', '🔙 ተመለስ']],
                 resize_keyboard=True
             )
         )
         return CONFIRM_MEAL
-    if update.message.text == '✅ የምግብ ዝርዝሩ ትክክል ነው':
+    if update.message.text == '✅ የምግብ ዝርዝሩ ትክክል ነዋ':
         total_price = context.user_data.get('total_price', 0)
         if total_price <= 0:
             raise ValueError("Invalid total price")
@@ -1944,7 +1944,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
-# Admin: Export PDF Orders Report (with Amharic support)
+# Admin: Export PDF Orders Report (with Amharic support for food names only)
 async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
@@ -1973,7 +1973,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         doc = SimpleDocTemplate(report_filename, pagesize=letter)
         styles = getSampleStyleSheet()
 
-        # Register Amharic font (download if not present)
+        # Register Amharic font for food names (download if not present)
         font_path = 'NotoSansEthiopic-Regular.ttf'
         try:
             if not os.path.exists(font_path):
@@ -1992,12 +1992,14 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 fontSize=10,
                 leading=12
             )
+            english_style = styles['Normal']  # Use default for English
         except Exception as font_error:
             logger.warning(f"Amharic font setup failed, falling back to default: {font_error}")
             amharic_style = styles['Normal']
+            english_style = styles['Normal']
 
         story = []
-        title = Paragraph("Oz Kitchen Orders Report / የኦዝ ኪችን ትዕዛዞች ሪፖርት", styles['Title'])
+        title = Paragraph("Oz Kitchen Orders Report", styles['Title'])
         story.append(title)
         story.append(Spacer(1, 0.5 * inch))
 
@@ -2042,46 +2044,46 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 total_order_price += sum(item['price'] for item in items)
 
             # Translate terms
-            plan_trans = 'ምሳ / Lunch' if plan_type == 'lunch' else 'እራት / Dinner'
-            status_trans = 'ተጠባቂ / Pending' if sub_status == 'pending' else 'ንቁ / Active'
+            plan_trans = 'Lunch' if plan_type == 'lunch' else 'Dinner'
+            status_trans = 'Pending' if sub_status == 'pending' else 'Active'
 
-            # User header
-            header_text = f"<b>User / ተጠቃሚ:</b> {full_name or 'N/A / የለም'} (ID: {telegram_id})<br/><b>Phone / ስልክ:</b> {phone_number or 'N/A / የለም'} | <b>Location / ቦታ:</b> {location or 'N/A / የለም'} | <b>Joined / ተመዝግቧል:</b> {user_created.strftime('%Y-%m-%d')}<br/><b>Subscription / ምዝገባ:</b> {plan_trans} | <b>Meals Left / ቀሪ ምግቦች:</b> {meals_remaining} | <b>Expiry / ጫና:</b> {expiry_date.strftime('%Y-%m-%d')} | <b>Status / ሁኔታ:</b> {status_trans} | <b>Subscribed / ተመዝግቧል:</b> {sub_created.strftime('%Y-%m-%d')}"
-            p_header = Paragraph(header_text, amharic_style)
+            # User header (English)
+            header_text = f"<b>User:</b> {full_name or 'N/A'} (ID: {telegram_id})<br/><b>Phone:</b> {phone_number or 'N/A'} | <b>Location:</b> {location or 'N/A'} | <b>Joined:</b> {user_created.strftime('%Y-%m-%d')}<br/><b>Subscription:</b> {plan_trans} | <b>Meals Left:</b> {meals_remaining} | <b>Expiry:</b> {expiry_date.strftime('%Y-%m-%d')} | <b>Status:</b> {status_trans} | <b>Subscribed:</b> {sub_created.strftime('%Y-%m-%d')}"
+            p_header = Paragraph(header_text, english_style)
             story.append(p_header)
             story.append(Spacer(1, 0.2 * inch))
 
-            # Payments
-            payments_text = "<b>Payments / ክፍያዎች:</b><br/>"
+            # Payments (English)
+            payments_text = "<b>Payments:</b><br/>"
             if payments:
                 for amount, paid_date, status in payments:
-                    status_trans = 'ተጠባቂ / Pending' if status == 'pending' else 'ተቀበለ / Approved' if status == 'approved' else 'ተውደቀ / Rejected'
-                    payments_text += f"  - Amount / መጠን: {amount:.2f} ETB / ብር | Date Paid / የተጠፉ ቀን: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status / ሁኔታ: {status_trans}<br/>"
-                payments_text += f"<br/>  <b>Total Paid / ጠቅላላ የተጠፉ:</b> {total_paid:.2f} ETB / ብር"
+                    status_trans = 'Pending' if status == 'pending' else 'Approved' if status == 'approved' else 'Rejected'
+                    payments_text += f"  - Amount: {amount:.2f} ETB | Date Paid: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status: {status_trans}<br/>"
+                payments_text += f"<br/>  <b>Total Paid:</b> {total_paid:.2f} ETB"
             else:
-                payments_text += "None / የሉም"
-            p_payments = Paragraph(payments_text, amharic_style)
+                payments_text += "None"
+            p_payments = Paragraph(payments_text, english_style)
             story.append(p_payments)
             story.append(Spacer(1, 0.2 * inch))
 
-            # Selected Dates
-            dates_text = f"<b>Selected Dates / የተመረጡ ቀናት:</b> {', '.join(selected_dates)}"
-            p_dates = Paragraph(dates_text, amharic_style)
+            # Selected Dates (English)
+            dates_text = f"<b>Selected Dates:</b> {', '.join(selected_dates)}"
+            p_dates = Paragraph(dates_text, english_style)
             story.append(p_dates)
             story.append(Spacer(1, 0.2 * inch))
 
-            # Orders
-            orders_text = f"<b>Food Ordered / የተቆጠሩ ምግቦች (Total Value / ጠቅላላ ዋጋ: {total_order_price:.2f} ETB / ብር):</b><br/>"
+            # Orders (English labels, Amharic food names)
+            orders_text = f"<b>Food Ordered (Total Value: {total_order_price:.2f} ETB):</b><br/>"
             if orders:
                 for meal_date, items_json, order_created in orders:
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                    orders_text += f"  - Date Ordered / የተቆጠረ ቀን: {meal_date} (Order Date / ትዕዛዝ ቀን: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
+                    orders_text += f"  - Date Ordered: {meal_date} (Order Date: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
                     for item in items:
-                        cat_trans = 'ጾም / Fasting' if item['category'] == 'fasting' else 'ፍስክ / Non-fasting'
-                        orders_text += f"    * {item['name']} ({item['price']:.2f} ETB / ብር, Category / መደብ: {cat_trans})<br/>"
+                        cat_trans = 'Fasting' if item['category'] == 'fasting' else 'Non-fasting'
+                        orders_text += f"    * {item['name']} ({item['price']:.2f} ETB, Category: {cat_trans})<br/>"
             else:
-                orders_text += "None / የሉም"
-            p_orders = Paragraph(orders_text, amharic_style)
+                orders_text += "None"
+            p_orders = Paragraph(orders_text, amharic_style)  # Use Amharic style for food names
             story.append(p_orders)
 
             story.append(Spacer(1, 0.3 * inch))
@@ -2095,7 +2097,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id,
             document=open(report_filename, 'rb'),
             filename=report_filename,
-            caption="📄 Orders Report PDF Exported Successfully! (Amharic text supported with NotoSansEthiopic font)"
+            caption="📄 Orders Report PDF Exported Successfully! (Food names in Amharic, details in English)"
         )
         os.remove(report_filename)  # Clean up
 
@@ -2675,7 +2677,7 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"💰 መጠን: {amount:.2f} ብር\n\n"
                 f"✅ ሁኔታ: {status.capitalize()}\n\n"
                 f"📅 ቀን: {created_at.strftime('%Y-%m-%d %H:%M')}\n\n"
-                "────────────\n\n"
+                "────────��───\n\n"
             )
         await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
