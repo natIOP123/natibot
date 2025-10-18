@@ -1288,7 +1288,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📜 ለ{first_day} ምግብ ይምረጡ:\n\n"
                 f"📅 የተመረጡ ቀናት: {', '.join(selected_dates)}\n\n"
                 f"🍽 ቀሪ ምግቦች: {len(selected_dates)}\n\n"
-                f"🍲 የጾም ምግብ ዝርዝር:\n\n"
+                "🍲 የጾም ምግብ ዝርዝር:\n\n"
             )
             for idx, item in enumerate(fasting_items, 1):
                 menu_text += f"{idx}. {item['name']} - {item['price']:.2f} ብር\n\n"
@@ -1636,7 +1636,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             menu_shown = context.user_data.get('menu_shown', False)
             if menu_shown:
                 next_prompt = (
-                    f"📅 ለ{next_day} ምግብ ቁጥር ያስገቡ (1-{len(menu_items)}):\n\n"
+                    f"📅 ለ{next_day} ምግብ ቁጥር ያስገ቉ (1-{len(menu_items)}):\n\n"
                     f"🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
                 )
             else:
@@ -1838,7 +1838,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not subscription_id or total_price <= 0:
             logger.error(f"Missing or invalid subscription_id or total_price for user {user.id}")
             await update.message.reply_text(
-                "❌ ስህተት: የመመዝገቢያዎ ወይም የክፍል መረጃዎ አይገኝም።\n\n"
+                "❌ ስህተት: የመመዝገቢያዎ ወይም የክፍፍ መረጃዎ አይገኝም።\n\n"
                 "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n\n"
                 "🔄 እንደገና ይጀምሩ!",
                 reply_markup=get_main_keyboard(user.id)
@@ -1874,7 +1874,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(
                         chat_id=admin_id,
                         text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
-                             f"⚠️ የማረጋገጫ URL የለም: {receipt_url}\n\n"
+                             f"⚠️ የማረጋጫ URL የለም: {receipt_url}\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
@@ -1899,8 +1899,8 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(
                         chat_id=admin_id,
                         text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
-                             f"⚠️ የማረጋገጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
-                             f"🔗 የማረጋገጫ URL: {receipt_url}\n\n"
+                             f"⚠️ የማረጋጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
+                             f"🔗 የማረጋጫ URL: {receipt_url}\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
@@ -2005,7 +2005,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_id, telegram_id, full_name, phone_number, location, user_created = user_row
             # Fetch subscription for this user (assume one active/pending)
             cur.execute("""
-                SELECT s.id, s.plan_type, s.meals_remaining, s.selected_dates, s.expiry_date, s.status
+                SELECT s.id, s.plan_type, s.meals_remaining, s.selected_dates, s.expiry_date, s.status, s.created_at as sub_created
                 FROM public.subscriptions s
                 WHERE s.user_id = %s AND s.status IN ('active', 'pending')
                 LIMIT 1
@@ -2013,7 +2013,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sub = cur.fetchone()
             if not sub:
                 continue
-            sub_id, plan_type, meals_remaining, selected_dates_json, expiry_date, sub_status = sub
+            sub_id, plan_type, meals_remaining, selected_dates_json, expiry_date, sub_status, sub_created = sub
             selected_dates = json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json
 
             # Fetch payments for this sub
@@ -2024,18 +2024,29 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ORDER BY created_at DESC
             """, (sub_id,))
             payments = cur.fetchall()
+            total_paid = sum(amount for amount, _, _ in payments) if payments else 0.0
 
             # Fetch orders for this sub
             cur.execute("""
-                SELECT meal_date, items
+                SELECT meal_date, items, created_at as order_created
                 FROM public.orders
                 WHERE subscription_id = %s AND status = 'confirmed'
                 ORDER BY meal_date
             """, (sub_id,))
             orders = cur.fetchall()
+            total_order_price = 0.0
+            all_items = []
+            for meal_date, items_json, order_created in orders:
+                items = json.loads(items_json) if isinstance(items_json, str) else items_json
+                all_items.extend(items)
+                total_order_price += sum(item['price'] for item in items)
+
+            # Translate terms
+            plan_trans = 'ምሳ / Lunch' if plan_type == 'lunch' else 'እራት / Dinner'
+            status_trans = 'ተጠባቂ / Pending' if sub_status == 'pending' else 'ንቁ / Active'
 
             # User header
-            header_text = f"<b>User / ተጠቃሚ:</b> {full_name or 'N/A / የለም'} (ID: {telegram_id})<br/><b>Phone / ስልክ:</b> {phone_number or 'N/A / የለም'} | <b>Location / ቦታ:</b> {location or 'N/A / የለም'} | <b>Joined / ተመዝግቧል:</b> {user_created.strftime('%Y-%m-%d')}<br/><b>Subscription / ምዝገባ:</b> {plan_type} | <b>Meals Left / ቀሪ ምግቦች:</b> {meals_remaining} | <b>Expiry / ጫና:</b> {expiry_date.strftime('%Y-%m-%d')} | <b>Status / ሁኔታ:</b> {sub_status}"
+            header_text = f"<b>User / ተጠቃሚ:</b> {full_name or 'N/A / የለም'} (ID: {telegram_id})<br/><b>Phone / ስልክ:</b> {phone_number or 'N/A / የለም'} | <b>Location / ቦታ:</b> {location or 'N/A / የለም'} | <b>Joined / ተመዝግቧል:</b> {user_created.strftime('%Y-%m-%d')}<br/><b>Subscription / ምዝገባ:</b> {plan_trans} | <b>Meals Left / ቀሪ ምግቦች:</b> {meals_remaining} | <b>Expiry / ጫና:</b> {expiry_date.strftime('%Y-%m-%d')} | <b>Status / ሁኔታ:</b> {status_trans} | <b>Subscribed / ተመዝግቧል:</b> {sub_created.strftime('%Y-%m-%d')}"
             p_header = Paragraph(header_text, amharic_style)
             story.append(p_header)
             story.append(Spacer(1, 0.2 * inch))
@@ -2044,7 +2055,9 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             payments_text = "<b>Payments / ክፍያዎች:</b><br/>"
             if payments:
                 for amount, paid_date, status in payments:
-                    payments_text += f"  - Amount / መጠን: {amount} ETB / ብር | Date Paid / የተጠፉ ቀን: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status / ሁኔታ: {status}<br/>"
+                    status_trans = 'ተጠባቂ / Pending' if status == 'pending' else 'ተቀበለ / Approved' if status == 'approved' else 'ተውደቀ / Rejected'
+                    payments_text += f"  - Amount / መጠን: {amount:.2f} ETB / ብር | Date Paid / የተጠፉ ቀን: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status / ሁኔታ: {status_trans}<br/>"
+                payments_text += f"<br/>  <b>Total Paid / ጠቅላላ የተጠፉ:</b> {total_paid:.2f} ETB / ብር"
             else:
                 payments_text += "None / የሉም"
             p_payments = Paragraph(payments_text, amharic_style)
@@ -2058,13 +2071,14 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             story.append(Spacer(1, 0.2 * inch))
 
             # Orders
-            orders_text = "<b>Food Ordered / የተቆጠሩ ምግቦች:</b><br/>"
+            orders_text = f"<b>Food Ordered / የተቆጠሩ ምግቦች (Total Value / ጠቅላላ ዋጋ: {total_order_price:.2f} ETB / ብር):</b><br/>"
             if orders:
-                for meal_date, items_json in orders:
+                for meal_date, items_json, order_created in orders:
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                    orders_text += f"  - Date / ቀን: {meal_date}<br/>"
+                    orders_text += f"  - Date Ordered / የተቆጠረ ቀን: {meal_date} (Order Date / ትዕዛዝ ቀን: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
                     for item in items:
-                        orders_text += f"    * {item['name']} ({item['price']} ETB / ብር, Category / መደብ: {item['category']})<br/>"
+                        cat_trans = 'ጾም / Fasting' if item['category'] == 'fasting' else 'ፍስክ / Non-fasting'
+                        orders_text += f"    * {item['name']} ({item['price']:.2f} ETB / ብር, Category / መደብ: {cat_trans})<br/>"
             else:
                 orders_text += "None / የሉም"
             p_orders = Paragraph(orders_text, amharic_style)
@@ -2142,7 +2156,7 @@ async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_
             )
         await update.message.reply_text(
             "📍 ከላይ የቆዩ የቦታ ጥያቄዎች ናቸው።\n\n"
-            "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
+            "🔧 ለማረጋገጥ ወይር ለመሰረዝ ይመርጡ!",
             reply_markup=get_main_keyboard(user.id)
         )
         return MAIN_MENU
