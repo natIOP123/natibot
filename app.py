@@ -17,6 +17,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+import requests
 
 # Enable logging
 logging.basicConfig(
@@ -1388,7 +1389,7 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         if not valid_items:
             await update.message.reply_text(
-                "❌ በዚህ ሳምንት የታቀዘ ምግቦች የሉም።\n\n"
+                "❌ በዚሚ ሳምንት የታቀዘ ምግቦች የሉም።\n\n"
                 "🔄 እባክዎ እንደገና ይሞክሩ!",
                 reply_markup=get_main_keyboard(update.effective_user.id)
             )
@@ -1722,7 +1723,7 @@ async def confirm_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
     await update.message.reply_text(
         order_text,
         reply_markup=ReplyKeyboardMarkup(
-            [['✅ የምግብ ዝርዝሩ ትክክል ነው', '⛔ አስተካክል'], ['ሰርዝ', '🔙 ���መለስ']],
+            [['✅ የምግብ ዝርዝሩ ትክክል ነው', '⛔ አስተካክል'], ['ሰርዝ', '🔙 ተመለስ']],
             resize_keyboard=True
         )
     )
@@ -1972,9 +1973,18 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         doc = SimpleDocTemplate(report_filename, pagesize=letter)
         styles = getSampleStyleSheet()
 
-        # Register Amharic font (assume NotoSansEthiopic-Regular.ttf is in the directory)
+        # Register Amharic font (download if not present)
+        font_path = 'NotoSansEthiopic-Regular.ttf'
         try:
-            pdfmetrics.registerFont(TTFont('Amharic', 'NotoSansEthiopic-Regular.ttf'))
+            if not os.path.exists(font_path):
+                logger.info("Downloading Amharic font...")
+                url = "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansEthiopic/NotoSansEthiopic-Regular.ttf"
+                response = requests.get(url)
+                response.raise_for_status()
+                with open(font_path, 'wb') as f:
+                    f.write(response.content)
+                logger.info("Font downloaded successfully.")
+            pdfmetrics.registerFont(TTFont('Amharic', font_path))
             amharic_style = ParagraphStyle(
                 'AmharicStyle',
                 parent=styles['Normal'],
@@ -1983,7 +1993,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 leading=12
             )
         except Exception as font_error:
-            logger.warning(f"Amharic font not found, falling back to default: {font_error}")
+            logger.warning(f"Amharic font setup failed, falling back to default: {font_error}")
             amharic_style = styles['Normal']
 
         story = []
@@ -2263,7 +2273,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                             text=f"💳 ክፍያ #{payment_id}\n\n"
                                  f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
                                  f"💰 መጠን: {amount:.2f} ብር\n\n"
-                                 f"🔗 የስምልጣ URL: {receipt_url}\n\n"
+                                 f"🔗 የማረጋገጫ URL: {receipt_url}\n\n"
                                  f"(⚠️ ማሳወቂያ: ስቶ ማሳየት ስህተት ተከሰተ: {str(e)})\n\n"
                                  "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                             reply_markup=reply_markup
@@ -2274,7 +2284,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                         text=f"💳 ክፍያ #{payment_id}\n\n"
                              f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
                              f"💰 መጠን: {amount:.2f} ብር\n\n"
-                             f"🔗 የስምልጣ URL: {receipt_url or 'የለም'} (የማይሰራ ወይም የለም URL)\n\n"
+                             f"🔗 የማረጋገጫ URL: {receipt_url or 'የለም'} (የማይሰራ ወይም የለም URL)\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=reply_markup
                     )
@@ -2417,7 +2427,7 @@ async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not subscription:
             await update.message.reply_text(
                 "❌ ንቁ ወይም ተጠባቂ ምዝገባዎች የሉም።\n\n"
-                "🛒 /subscribe ይጠቀሙ አ���ድ ያጀምሩ።\n\n"
+                "🛒 /subscribe ይጠቀሙ አዲስ ያጀምሩ።\n\n"
                 "🚀 ምዝገባ ይጀምሩ!",
                 reply_markup=get_main_keyboard(user.id)
             )
