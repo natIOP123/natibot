@@ -641,12 +641,11 @@ async def reschedule_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if current_time + timedelta(hours=3) >= scheduled_time:
                 continue
             items = json.loads(items_json) if isinstance(items_json, str) else items_json
-            item = items[0]  # Assume one item per order
             eligible_orders.append({
                 'order_id': order_id,
                 'plan_type': plan_type,
                 'meal_date': meal_date,
-                'item': item,
+                'items': items,
                 'expiry': expiry_date
             })
         if not eligible_orders:
@@ -661,8 +660,8 @@ async def reschedule_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, ord in enumerate(eligible_orders, 1):
             meal_d = ord['meal_date'].strftime('%Y-%m-%d')
             plan_am = 'ምሳ' if ord['plan_type'] == 'lunch' else 'እራት'
-            item_n = ord['item']['name']
-            text += f"{idx}. {meal_d} ({plan_am}): {item_n}\n\n"
+            items_names = ', '.join([item['name'] for item in ord['items']])
+            text += f"{idx}. {meal_d} ({plan_am}): {items_names}\n\n"
         text += "🔢 ለማዘዋወር ቁጥር ያስገቡ።"
         context.user_data['eligible_orders'] = eligible_orders
         await update.message.reply_text(
@@ -797,10 +796,11 @@ async def reschedule_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Confirm
     old_date_str = selected_order['meal_date'].strftime('%Y-%m-%d')
     plan_am = 'ምሳ' if selected_order['plan_type'] == 'lunch' else 'እራት'
+    items_names = ', '.join([item['name'] for item in selected_order['items']])
     confirm_text = (
         f"🔄 ማዘዋወር ማረጋገጫ:\n\n"
         f"ከ {old_date_str} ({plan_am}) ወደ {new_date}\n\n"
-        f"🍴 {selected_order['item']['name']}\n\n"
+        f"🍴 {items_names}\n\n"
         "✅ ያረጋግጡ?"
     )
     keyboard = [['✅ አረጋግጥ', '⛔ ሰርዝ'], ['🔙 ተመለስ']]
@@ -1614,7 +1614,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             menu_shown = context.user_data.get('menu_shown', False)
             prompt = f"❌ ለ{current_day} ቢያንስ አንድ ምግብ ይምረጡ።\n\n"
             if menu_shown:
-                prompt += f"🔢 ለ{current_day} ቁጥር ያስገቡ (1-{len(menu_items)}):\n\n"
+                prompt += f"🔢 ለ{current_day} ቁጥል ያስገቡ (1-{len(menu_items)}):\n\n"
             else:
                 fasting_items = [item for item in menu_items if item['category'] == 'fasting']
                 non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
@@ -1638,7 +1638,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
         menu_shown = context.user_data.get('menu_shown', False)
         if menu_shown:
             next_prompt = (
-                f"📅 ለ{next_day} ምግብ ቁጥር ያስገቡ (1-{len(menu_items)}):\n\n"
+                f"📅 ለ{next_day} ምግብ ቁጥል ያስገቡ (1-{len(menu_items)}):\n\n"
                 f"🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
             )
         else:
@@ -1654,7 +1654,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             for idx, item in enumerate(non_fasting_items, 1):
                 next_prompt += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
             next_prompt += (
-                f"📝 ለ{next_day} የምግብ ቁጥል ያስገ቉ (ለምሳሌ፣ '1')።\n\n"
+                f"📝 ለ{next_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n\n"
                 "🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
             )
             context.user_data['menu_shown'] = True
@@ -1686,7 +1686,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             menu_shown = context.user_data.get('menu_shown', False)
             if menu_shown:
                 next_prompt = (
-                    f"📅 ለ{next_day} ምግብ ቁጥር ያስገ቉ (1-{len(menu_items)}):\n\n"
+                    f"📅 ለ{next_day} ምግብ ቁጥል ያስገቡ (1-{len(menu_items)}):\n\n"
                     f"🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
                 )
             else:
@@ -1713,7 +1713,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             return MEAL_SELECTION
         else:
             menu_shown = context.user_data.get('menu_shown', False)
-            error_prompt = f"❌ የማይሰራ የምግብ ቁጥር {text}።\n\n"
+            error_prompt = f"❌ የማይሰራ የምግብ ቁጥል {text}።\n\n"
             if menu_shown:
                 error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጡ።\n\n"
             else:
@@ -1727,7 +1727,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
                     error_prompt += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
                 error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጡ።\n\n"
                 context.user_data['menu_shown'] = True
-            error_prompt += "🔄 ትክክለኛ ቁጥር ያስገቡ!"
+            error_prompt += "🔄 ትክክለኛ ቁጥል ያስገቡ!"
             await update.message.reply_text(
                 error_prompt,
                 reply_markup=ReplyKeyboardMarkup([['ጨርስ'], ['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
@@ -1925,7 +1925,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         chat_id=admin_id,
                         text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
                              f"⚠️ የማረጋጫ URL የለም: {receipt_url}\n\n"
-                             "🔧 ለ��ረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
+                             "🔧 ለማረጋጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
                              InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
@@ -1951,7 +1951,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
                              f"⚠️ የማረጋጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
                              f"🔗 የማረጋጫ URL: {receipt_url}\n\n"
-                             "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
+                             "🔧 ለማረጋጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
                              InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
@@ -2129,8 +2129,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
                     orders_text += f"  - Date Ordered: {meal_date} (Order Date: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
                     for item in items:
-                        cat_trans = 'Fasting' if item['category'] == 'fasting' else 'Non-fasting'
-                        orders_text += f"    * {item['name']} -------- {item['price']:.2f} ETB ({cat_trans})<br/>"
+                        orders_text += f"    * {item['name']} ------- {total_paid:.2f} ETB<br/>"
             else:
                 orders_text += "None"
             p_orders = Paragraph(orders_text, amharic_style)  # Use Amharic style for food names
@@ -2361,7 +2360,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                     text=f"💳 ክፍያ #{payment_id}\n\n"
                          f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
                          f"💰 መጠን: {amount:.2f} ብር\n\n"
-                         f"⚠️ ስህተት: የማረጋገጫ ዝርዝር ማስተካካከል አልተሳካም\n\n"
+                         f"⚠️ ስህተት: የማረጋገጥ ዝርዝር ማስተካከል አልተሳካም\n\n"
                          "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                     reply_markup=reply_markup
                 )
@@ -2510,7 +2509,7 @@ async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📅 የተመረጡ ቀናት: {', '.join(selected_dates)}\n\n"
             f"⏰ የጊዜ ጫና: {expiry_date.strftime('%Y-%m-%d')}\n\n"
             f"✅ ሁኔታ: {status.capitalize()}\n\n"
-            "🍴 ምግቦችዎን ለመምረጥ /select_meals ይጠቀሙ።\n\n"
+            "🍴 ምግቦችዎን ለመምረጫ /select_meals ይጠቀሙ።\n\n"
             "🚀 ምግቦችን ይምረጡ!"
         )
         await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
@@ -2632,9 +2631,9 @@ async def process_admin_delete_menu(update: Update, context: ContextTypes.DEFAUL
         week_start = context.user_data.get('week_start')
         if not (0 <= item_idx < len(menu_items)):
             await update.message.reply_text(
-                f"❌ የማይሰራ የንጥል ቁጥር።\n\n"
+                f"❌ የማይሰራ የንጥል ቁጥል።\n\n"
                 f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጡ።\n\n"
-                "🔄 ትክክለኛ ቁጥር ያስገቡ!",
+                "🔄 ትክክለኛ ቁጥል ያስገቡ!",
                 reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
             )
             return ADMIN_DELETE_MENU
@@ -2881,7 +2880,7 @@ async def process_set_admin_location(update: Update, context: ContextTypes.DEFAU
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error setting admin location: {e}")
-        await update.message.reply_text("❌ ቦታ በማዘጋጀት ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([["ዝለል", '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ ቦታ በማዘጋጀት ላይ ስህተት።\n\n🔄 እባክዎ እ��ደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([["ዝለል", '🔙 ተመለስ']], resize_keyboard=True))
         return SET_ADMIN_LOCATION
     finally:
         if cur:
