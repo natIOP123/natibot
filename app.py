@@ -11,7 +11,6 @@ import math
 import validators
 from time import sleep
 from shapely.geometry import Point, Polygon
-from fpdf import FPDF
 
 # Enable logging
 logging.basicConfig(
@@ -278,7 +277,7 @@ def build_delete_menu_text(menu_items, week_start):
     valid_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     day_order = {day: idx for idx, day in enumerate(valid_days)}
     sorted_items = sorted(menu_items, key=lambda x: day_order.get(x['day'], len(valid_days)))
-    text = f"📋 የምግብ ዝርዝር ለሳምንቱ መጀመሪያ {week_start} (ለመሰረዝ የተወሰነ ንጥል ይምረጡ):\n\n"
+    text = f"📋 የምግብ ዝርዝር ለሳምንቱ መጀመሪያ {week_start} (ለማስወገድ የተወሰነ ንጥል ይምረጡ):\n\n"
     for idx, item in enumerate(sorted_items, 1):
         text += f"{idx}. {item['day']}: {item['name']} - {item['price']:.2f} ብር\n\n"
     return text
@@ -759,7 +758,7 @@ async def reschedule_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await back_to_main(update, context)
     selected_order = context.user_data.get('selected_order')
     if not selected_order:
-        await update.message.reply_text("❌ ስህተት: ትዕዛዝ አልተመረጠም።\n\n🔄 /select_meals ይጀምሩ!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ ስህተት: ትዕዛዝ አ���ተመረጠም።\n\n🔄 /select_meals ይጀምሩ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     possible_dates = context.user_data.get('possible_dates', [])
     new_date = None
@@ -1338,7 +1337,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append(['ጨርስ', '🔙 ተመለስ'])
         await update.message.reply_text(
             f"✅ {choice} ታክሏል።\n\n"
-            "📅 ተጨማሪ ቀናት ይምረጡ ወይም 'ጨርስ' ይጫኑ።\n\n"
+            "📅 ተጨማሪ ቀና቉ ይምረጡ ወይም 'ጨርስ' ይጫኑ።\n\n"
             "🚀 ቀናት ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
@@ -1383,7 +1382,7 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         if not valid_items:
             await update.message.reply_text(
-                "❌ በዚህ ሳምንት የታቀዱ ምግቦች የሉም።\n\n"
+                "❌ በዚህ ሳምንት የታቀዘ ምግቦች የሉም።\n\n"
                 "🔄 እባክዎ እንደገና ይሞክሩ!",
                 reply_markup=get_main_keyboard(update.effective_user.id)
             )
@@ -1806,7 +1805,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text and update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         await update.message.reply_text(
             "❌ ምዝገባ ተሰርዟል።\n\n"
-            "🔙 ወደ መነሻ ገጽ!",
+            "🔙 ወደ መ��ሻ ገጽ!",
             reply_markup=get_main_keyboard(user.id)
         )
         context.user_data.clear()
@@ -1938,7 +1937,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if conn:
             conn.close()
 
-# Admin: Export PDF Orders Report
+# Admin: Export TXT Orders Report (changed from PDF to TXT to avoid Unicode issues)
 async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
@@ -1962,112 +1961,87 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ ለፒዲኤፍ ወጣ የተመዘገቡ ተጠቃሚዎች ወይም ትዕዛዞች የሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
 
-        # Generate PDF
-        class PDFReport(FPDF):
-            def header(self):
-                self.set_font('Arial', 'B', 15)
-                self.cell(0, 10, 'Oz Kitchen Orders Report', 0, 1, 'C')
-                self.ln(5)
+        # Generate TXT report
+        report_filename = f"orders_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        with open(report_filename, 'w', encoding='utf-8') as f:
+            f.write("Oz Kitchen Orders Report\n")
+            f.write("=" * 50 + "\n\n")
+            for user_row in users:
+                user_id, telegram_id, full_name, phone_number, location, user_created = user_row
+                # Fetch subscription for this user (assume one active/pending)
+                cur.execute("""
+                    SELECT s.id, s.plan_type, s.meals_remaining, s.selected_dates, s.expiry_date, s.status
+                    FROM public.subscriptions s
+                    WHERE s.user_id = %s AND s.status IN ('active', 'pending')
+                    LIMIT 1
+                """, (telegram_id,))
+                sub = cur.fetchone()
+                if not sub:
+                    continue
+                sub_id, plan_type, meals_remaining, selected_dates_json, expiry_date, sub_status = sub
+                selected_dates = json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json
 
-            def footer(self):
-                self.set_y(-15)
-                self.set_font('Arial', 'I', 8)
-                self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
+                # Fetch payments for this sub
+                cur.execute("""
+                    SELECT amount, created_at, status
+                    FROM public.payments
+                    WHERE subscription_id = %s
+                    ORDER BY created_at DESC
+                """, (sub_id,))
+                payments = cur.fetchall()
 
-        pdf = PDFReport()
-        pdf.add_page()
-        pdf.set_font('Arial', '', 12)
+                # Fetch orders for this sub
+                cur.execute("""
+                    SELECT meal_date, items
+                    FROM public.orders
+                    WHERE subscription_id = %s AND status = 'confirmed'
+                    ORDER BY meal_date
+                """, (sub_id,))
+                orders = cur.fetchall()
 
-        for user_row in users:
-            user_id, telegram_id, full_name, phone_number, location, user_created = user_row
-            # Fetch subscription for this user (assume one active/pending)
-            cur.execute("""
-                SELECT s.id, s.plan_type, s.meals_remaining, s.selected_dates, s.expiry_date, s.status
-                FROM public.subscriptions s
-                WHERE s.user_id = %s AND s.status IN ('active', 'pending')
-                LIMIT 1
-            """, (telegram_id,))
-            sub = cur.fetchone()
-            if not sub:
-                continue
-            sub_id, plan_type, meals_remaining, selected_dates_json, expiry_date, sub_status = sub
-            selected_dates = json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json
+                # Write user header
+                f.write(f"User: {full_name or 'N/A'} (ID: {telegram_id})\n")
+                f.write(f"Phone: {phone_number or 'N/A'} | Location: {location or 'N/A'} | Joined: {user_created.strftime('%Y-%m-%d')}\n")
+                f.write(f"Subscription: {plan_type} | Meals Left: {meals_remaining} | Expiry: {expiry_date.strftime('%Y-%m-%d')} | Status: {sub_status}\n\n")
 
-            # Fetch payments for this sub
-            cur.execute("""
-                SELECT amount, created_at, status
-                FROM public.payments
-                WHERE subscription_id = %s
-                ORDER BY created_at DESC
-            """, (sub_id,))
-            payments = cur.fetchall()
+                # Payments
+                if payments:
+                    f.write("Payments:\n")
+                    for amount, paid_date, status in payments:
+                        f.write(f"  - Amount: {amount} ETB | Date Paid: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status: {status}\n")
+                else:
+                    f.write("Payments: None\n")
+                f.write("\n")
 
-            # Fetch orders for this sub
-            cur.execute("""
-                SELECT meal_date, items
-                FROM public.orders
-                WHERE subscription_id = %s AND status = 'confirmed'
-                ORDER BY meal_date
-            """, (sub_id,))
-            orders = cur.fetchall()
+                # Selected Dates
+                f.write(f"Selected Dates: {', '.join(selected_dates)}\n\n")
 
-            # Print user header
-            pdf.set_font('Arial', 'B', 12)
-            pdf.cell(0, 10, f'User: {full_name or "N/A"} (ID: {telegram_id})', 0, 1)
-            pdf.set_font('Arial', '', 10)
-            pdf.cell(0, 5, f'Phone: {phone_number or "N/A"} | Location: {location or "N/A"} | Joined: {user_created.strftime("%Y-%m-%d")}', 0, 1)
-            pdf.cell(0, 5, f'Subscription: {plan_type} | Meals Left: {meals_remaining} | Expiry: {expiry_date.strftime("%Y-%m-%d")} | Status: {sub_status}', 0, 1)
-            pdf.ln(2)
+                # Orders
+                if orders:
+                    f.write("Food Ordered:\n")
+                    for meal_date, items_json in orders:
+                        items = json.loads(items_json) if isinstance(items_json, str) else items_json
+                        f.write(f"  - Date: {meal_date}\n")
+                        for item in items:
+                            f.write(f"    * {item['name']} ({item['price']} ETB, Category: {item['category']})\n")
+                else:
+                    f.write("Orders: None\n")
 
-            # Payments
-            if payments:
-                pdf.set_font('Arial', 'B', 10)
-                pdf.cell(0, 5, 'Payments:', 0, 1)
-                pdf.set_font('Arial', '', 10)
-                for amount, paid_date, status in payments:
-                    pdf.cell(0, 5, f'  - Amount: {amount} ETB | Date Paid: {paid_date.strftime("%Y-%m-%d %H:%M") if paid_date else "N/A"} | Status: {status}', 0, 1)
-            else:
-                pdf.cell(0, 5, 'Payments: None', 0, 1)
-            pdf.ln(2)
-
-            # Selected Dates
-            pdf.set_font('Arial', 'B', 10)
-            pdf.cell(0, 5, 'Selected Dates: ' + ', '.join(selected_dates), 0, 1)
-            pdf.set_font('Arial', '', 10)
-            pdf.ln(2)
-
-            # Orders
-            if orders:
-                pdf.set_font('Arial', 'B', 10)
-                pdf.cell(0, 5, 'Food Ordered:', 0, 1)
-                pdf.set_font('Arial', '', 10)
-                for meal_date, items_json in orders:
-                    items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                    pdf.cell(0, 5, f'  - Date: {meal_date}', 0, 1)
-                    for item in items:
-                        pdf.cell(0, 5, f'    * {item["name"]} ({item["price"]} ETB, Category: {item["category"]})', 0, 1)
-            else:
-                pdf.cell(0, 5, 'Orders: None', 0, 1)
-
-            pdf.ln(5)
-            pdf.add_page()  # New page for next user if needed
-
-        pdf_filename = f"orders_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        pdf.output(pdf_filename)
+                f.write("\n" + "-" * 50 + "\n\n")
 
         await context.bot.send_document(
             chat_id=update.effective_chat.id,
-            document=open(pdf_filename, 'rb'),
-            filename=pdf_filename,
-            caption="📄 Orders Report PDF Exported Successfully!"
+            document=open(report_filename, 'rb'),
+            filename=report_filename,
+            caption="📄 Orders Report TXT Exported Successfully!"
         )
-        os.remove(pdf_filename)  # Clean up
+        os.remove(report_filename)  # Clean up
 
-        await update.message.reply_text("✅ PDF Report Exported and Sent!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("✅ TXT Report Exported and Sent!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
-        logger.error(f"Error generating PDF report: {e}")
-        await update.message.reply_text("❌ Error generating PDF report. Please try again.", reply_markup=get_main_keyboard(user.id))
+        logger.error(f"Error generating TXT report: {e}")
+        await update.message.reply_text("❌ Error generating TXT report. Please try again.", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     finally:
         if cur:
@@ -2115,8 +2089,7 @@ async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_
             )
         await update.message.reply_text(
             "📍 ከላይ የቆዩ የቦታ ጥያቄዎች ናቸው።\n\n"
-            "🔧 ለማረጋገጥ ወይም ለመሰረዝ አማራጮቹን ይጠቀሙ።\n\n"
-            "🚀 እርምጃ ይወስዱ!",
+            "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
             reply_markup=get_main_keyboard(user.id)
         )
         return MAIN_MENU
@@ -2469,7 +2442,7 @@ async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAUL
             (week_start, json.dumps(menu_data))
         )
         conn.commit()
-        await update.message.reply_text("✅ ምግብ ዝርዝር በተሳካ ሁኔታ ተዘመነ።\n\n🚀 ተዘመነ!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("✅ ምግብ ዝርዝር በተሳካ ሁኔታ ተዘመነ።\n\n🚀 ተዘመን!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error updating menu: {e}")
@@ -2511,7 +2484,7 @@ async def admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = build_delete_menu_text(menu_items, week_start)
         await update.message.reply_text(
             f"{text}\n\n"
-            "🔢 ለማስወገድ ነጠላ ቁጥር ያስገቡ (ለምሳሌ: '1') ወይም 'ሰርዝ' ይጻፉ።\n\n"
+            "🔢 ለማስወገድ ንጥል ያስገቡ (ለምሳሌ: '1') ወይም 'ሰርዝ' ይፃፉ።\n\n"
             "🚀 ንጥል ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
         )
@@ -2543,7 +2516,7 @@ async def process_admin_delete_menu(update: Update, context: ContextTypes.DEFAUL
                 f"❌ የማይሰራ የንጥል ቁጥር።\n\n"
                 f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጡ።\n\n"
                 "🔄 ትክክለኛ ቁጥር ያስገቡ!",
-                reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '��� ተመለስ']], resize_keyboard=True)
+                reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
             )
             return ADMIN_DELETE_MENU
         menu_items.pop(item_idx)
@@ -2554,7 +2527,7 @@ async def process_admin_delete_menu(update: Update, context: ContextTypes.DEFAUL
             (json.dumps(menu_items), week_start)
         )
         conn.commit()
-        await update.message.reply_text("✅ የምግብ ዝርዝር ንጥል በተሳካ ሁኔታ ተሰርዟል።\n\n🚀 ተሰርዟል!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("✅ የምግብ ዝርዝር ንጥል በተሳካ ሁኔታ ተሰርዟል።\n\n🚀 ተሰርዟል!\n\n🔙 ወደ መነሻ ��ጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error deleting menu item: {e}")
@@ -2584,7 +2557,7 @@ async def admin_subscribers(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         subscribers = cur.fetchall()
         if not subscribers:
-            await update.message.reply_text("❌ ንቁ ወይም ተጠባቂ ተመዝጋቢዎች አልተገኙም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ ንቁ ወይም ተጠባቂ ተመዝጋቢዎች አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
         text = "📋 ንቁ/ተጠባቂ ተመዝጋቢዎች:\n\n"
         for full_name, username, plan_type, meals_remaining, expiry_date in subscribers:
@@ -2625,7 +2598,7 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         payments = cur.fetchall()
         if not payments:
-            await update.message.reply_text("❌ ክፍያዎች አልተገኙም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ ክፍያዎች አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
         text = "💸 የክፍያ ታሪክ:\n\n"
         for payment_id, full_name, username, amount, status, created_at in payments:
@@ -2745,7 +2718,7 @@ async def process_admin_announce(update: Update, context: ContextTypes.DEFAULT_T
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error sending announcement: {e}")
-        await update.message.reply_text("❌ ማስታወቂያ በማላክ ላዋይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ ማስታወቂያ በማላክ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
         return ADMIN_ANNOUNCE
     finally:
         if cur:
