@@ -912,7 +912,7 @@ async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return REGISTER_PHONE
     except Exception as e:
         logger.error(f"Error saving name for user {user.id}: {e}")
-        await update.message.reply_text("❌ ስም በማስቀመጥ ላይ ስህተት ተከ��ቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+        await update.message.reply_text("❌ ስም በማስቀመጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return REGISTER_NAME
     finally:
         if cur:
@@ -2711,7 +2711,7 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
-            "SELECT p.id, u.full_name, u.username, p.amount, p.status, p.created_at "
+            "SELECT p.id, u.full_name, u.username, p.amount, p.status, p.created_at, p.receipt_url "
             "FROM public.payments p JOIN public.users u ON p.user_id = u.telegram_id "
             "ORDER BY p.created_at DESC"
         )
@@ -2719,17 +2719,34 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not payments:
             await update.message.reply_text("❌ ክፍያዎች አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
-        text = "💸 የክፍያ ታሪክ:\n\n"
-        for payment_id, full_name, username, amount, status, created_at in payments:
-            text += (
+        for payment_id, full_name, username, amount, status, created_at, receipt_url in payments:
+            caption = (
                 f"💳 ክፍያ #{payment_id}\n\n"
                 f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
                 f"💰 መጠን: {amount:.2f} ብር\n\n"
                 f"✅ ሁኔታ: {status.capitalize()}\n\n"
                 f"📅 ቀን: {created_at.strftime('%Y-%m-%d %H:%M')}\n\n"
-                "────────────\n\n"
+                f"🔗 ማረጋገጫ: {receipt_url or 'የለም'}"
             )
-        await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
+            try:
+                if receipt_url and validators.url(receipt_url):
+                    await context.bot.send_photo(
+                        chat_id=user.id,
+                        photo=receipt_url,
+                        caption=caption
+                    )
+                else:
+                    await context.bot.send_message(
+                        chat_id=user.id,
+                        text=caption
+                    )
+            except Exception as e:
+                logger.error(f"Error sending payment history for {payment_id}: {e}")
+                await context.bot.send_message(
+                    chat_id=user.id,
+                    text=caption + f"\n\n⚠️ ስህተት: ማሳየት አልተሳካም ({str(e)})"
+                )
+        await update.message.reply_text("✅ የክፍያ ታሪክ ተመልክቷል (በተቻለ ምስሎች ጋር)!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching payments: {e}")
