@@ -2422,9 +2422,6 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 text=detailed_text,
                 reply_markup=get_main_keyboard(user_id)
             )
-            # Send help text
-            fake_update = Update(0, message=type('obj', (object,), {'effective_user': type('obj', (object,), {'id': user_id})}))
-            await send_help_text(fake_update, context)
         elif action == 'reject':
             cur.execute(
                 "UPDATE public.payments SET status = 'rejected' WHERE id = %s",
@@ -2703,7 +2700,7 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         payments = cur.fetchall()
         if not payments:
-            await update.message.reply_text("❌ ���ፍያዎች አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ ክፍያዎች አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
         await update.message.reply_text("💸 የክፍያ ታሪክ እየተላከ ነው...", reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True))
         for payment_id, full_name, username, amount, status, created_at, receipt_url in payments:
