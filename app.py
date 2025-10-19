@@ -912,7 +912,7 @@ async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return REGISTER_PHONE
     except Exception as e:
         logger.error(f"Error saving name for user {user.id}: {e}")
-        await update.message.reply_text("❌ ስም በማስቀመጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+        await update.message.reply_text("❌ ስም በማስቀመጥ ላይ ስህተት ተከ��ቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return REGISTER_NAME
     finally:
         if cur:
@@ -2111,7 +2111,6 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     status_trans = 'Pending' if status == 'pending' else 'Approved' if status == 'approved' else 'Rejected'
                     payments_text += f"  - Amount: {amount:.2f} ETB | Date Paid: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status: {status_trans}<br/>"
                 payments_text += f"<br/>  <b>Total Paid:</b> {total_paid:.2f} ETB"
-                payments_text += f"<br/>  <b>Payment History Telegram API Link:</b> <a href='https://api.telegram.org/bot{BOT_TOKEN}/sendMessage?chat_id={telegram_id}&text=/admin_payments'>View Payment History</a>"
             else:
                 payments_text += "None"
             p_payments = Paragraph(payments_text, english_style)
