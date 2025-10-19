@@ -1787,7 +1787,7 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text and update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         context.user_data.clear()
         await update.message.reply_text(
-            "❌ ምዝገባ ተሰርዟል።\n\n"
+            "❌ ሥራ ተሰርዟል።\n\n"
             "🔙 ወደ መነሻ ገጽ!",
             reply_markup=get_main_keyboard(user.id)
         )
@@ -1832,8 +1832,7 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return MEAL_SELECTION
     if update.message.text != '✅ የምግብ ዝርዝሩ ትክክል ነዋ':
         await update.message.reply_text(
-            "❌ እባክዎ '✅ የምግብ ዝርዝሩ ትክክል ነዋ' ወይም '⛔ አስተካክል' ይምረጠው።\n\n"
-            "🔄 ትክክለኛ ምርጫ ይምረጠው!",
+            "❌ እባክዎ '✅ የምግብ ዝርዝሩ ትክክል ነዋ' ወይም '⛔ አስተካክል' ይምረጠው።",
             reply_markup=ReplyKeyboardMarkup(
                 [['✅ የምግብ ዝርዝሩ ትክክል ነዋ', '⛔ አስተካክል'], ['ሰርዝ', '🔙 ተመለስ']],
                 resize_keyboard=True
@@ -1936,7 +1935,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         chat_id=admin_id,
                         text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
                              f"⚠️ የማረጋገጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
-                             f"🔗 የማረጋገጫ File ID: {receipt_url}\n\n"
+                             "🔗 የማረጋገጫ File ID: {receipt_url}\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
@@ -2194,7 +2193,7 @@ async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_
             )
         await update.message.reply_text(
             "📍 ከላይ የቆዩ የቦታ ጥያቄዎች ናቸው።\n\n"
-            "🔧 ለማረጋገጥ ወይር ለመሰረዝ ይመርጡ!",
+            "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
             reply_markup=get_main_keyboard(user.id)
         )
         return MAIN_MENU
@@ -2446,7 +2445,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 text="❌ ክፍያዎ ተሰርዟል።\n\n"
                      "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n\n"
                      "🔄 እንደገና ይጀምሩ!",
-                reply_markup=get_main_keyboard(user_id)
+                reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
             )
     except Exception as e:
         logger.error(f"Error processing payment callback for payment {payment_id}: {e}")
@@ -2529,7 +2528,7 @@ async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         await update.message.reply_text("❌ የምግብ ዝርዝር ማዘመን ተሰርዟል።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
@@ -2704,7 +2703,7 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         payments = cur.fetchall()
         if not payments:
-            await update.message.reply_text("❌ ክፍያዎች አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ ���ፍያዎች አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
         await update.message.reply_text("💸 የክፍያ ታሪክ እየተላከ ነው...", reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True))
         for payment_id, full_name, username, amount, status, created_at, receipt_url in payments:
