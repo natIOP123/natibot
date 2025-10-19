@@ -912,7 +912,7 @@ async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return REGISTER_PHONE
     except Exception as e:
         logger.error(f"Error saving name for user {user.id}: {e}")
-        await update.message.reply_text("❌ ስም በማስቀመጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+        await update.message.reply_text("❌ ስም በማስቀመጥ ላይ ስህተት ተከ��ቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return REGISTER_NAME
     finally:
         if cur:
@@ -2129,7 +2129,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
                     orders_text += f"  - Date Ordered: {meal_date} (Order Date: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
                     for item in items:
-                        orders_text += f"    * {item['name']} ------- {total_paid:.2f} ETB<br/>"
+                        orders_text += f"    * {item['name']} ------- {item['price']:.2f} ETB<br/>"
             else:
                 orders_text += "None"
             p_orders = Paragraph(orders_text, amharic_style)  # Use Amharic style for food names
@@ -2880,7 +2880,7 @@ async def process_set_admin_location(update: Update, context: ContextTypes.DEFAU
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error setting admin location: {e}")
-        await update.message.reply_text("❌ ቦታ በማዘጋጀት ላይ ስህተት።\n\n🔄 እባክዎ እ��ደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([["ዝለል", '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ ቦታ በማዘጋጀት ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([["ዝለል", '🔙 ተመለስ']], resize_keyboard=True))
         return SET_ADMIN_LOCATION
     finally:
         if cur:
