@@ -2705,34 +2705,17 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not payments:
             await update.message.reply_text("❌ ክፍያዎች አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
-        await update.message.reply_text("💸 የክፍያ ታሪክ:")
+        text = "💸 የክፍያ ታሪክ:\n\n"
         for payment_id, full_name, username, amount, status, created_at, receipt_url in payments:
-            caption = (
-                f"💳 ክፍያ #{payment_id}\n\n"
-                f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
-                f"💰 መጠን: {amount:.2f} ብር\n\n"
-                f"✅ ሁኔታ: {status.capitalize()}\n\n"
-                f"📅 ቀን: {created_at.strftime('%Y-%m-%d %H:%M')}"
-            )
+            text += f"💳 ክፍያ #{payment_id}\n"
+            text += f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n"
+            text += f"💰 መጠን: {amount:.2f} ብር\n"
+            text += f"✅ ሁኔታ: {status.capitalize()}\n"
+            text += f"📅 ቀን: {created_at.strftime('%Y-%m-%d %H:%M')}\n"
             if receipt_url:
-                try:
-                    await context.bot.send_photo(
-                        chat_id=user.id,
-                        photo=receipt_url,
-                        caption=caption
-                    )
-                except Exception as e:
-                    logger.error(f"Error sending photo for payment {payment_id}: {e}")
-                    await context.bot.send_message(
-                        chat_id=user.id,
-                        text=f"{caption}\n\n🔗 File ID: {receipt_url}"
-                    )
-            else:
-                await context.bot.send_message(
-                    chat_id=user.id,
-                    text=caption
-                )
-        await update.message.reply_text("────────────", reply_markup=get_main_keyboard(user.id))
+                text += f"🔗 File ID: {receipt_url}\n"
+            text += "\n───\n\n"
+        await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching payments: {e}")
@@ -2840,7 +2823,7 @@ async def process_admin_announce(update: Update, context: ContextTypes.DEFAULT_T
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error sending announcement: {e}")
-        await update.message.reply_text("❌ ማስታወቂያ በማላክ ላይ ስህተተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ ማስ���ወቂያ በማላክ ላይ ስህተተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
         return ADMIN_ANNOUNCE
     finally:
         if cur:
@@ -3064,7 +3047,7 @@ def main():
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር አዘምን$'), admin_update_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር ሰርዝ$'), admin_delete_menu),
                     MessageHandler(filters.Regex('^🔐 ተመዝጋቢዎችን ተመልከት$'), admin_subscribers),
-                    MessageHandler(filters.Regex('^🔐 ክፍያዋዎችን ተመልከት$'), admin_payments),
+                    MessageHandler(filters.Regex('^🔐 ክፍያዎችን ተመልከት$'), admin_payments),
                     MessageHandler(filters.Regex('^🔐 ክፍያዎችን አረጋግጥ$'), admin_approve_payment),
                     MessageHandler(filters.Regex('^🔐 የዕለት ትዕዛዞች$'), admin_daily_orders),
                     MessageHandler(filters.Regex('^🔐 ማስታወቂያ$'), admin_announce),
