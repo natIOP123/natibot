@@ -2368,6 +2368,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
             conn.close()
 
 # Handle payment approval/rejection callback
+# Handle payment approval/rejection callback
 async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -2386,9 +2387,17 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         )
         payment = cur.fetchone()
         if not payment:
-            await query.edit_message_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
+            await query.edit_message_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n🔄 እንደገና ይመልከቱ!")
             return
         user_id, subscription_id, amount = payment
+
+        # Fetch selected meals for the subscription
+        cur.execute(
+            "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
+            (subscription_id,)
+        )
+        orders = cur.fetchall()
+
         if action == 'approve':
             cur.execute(
                 "UPDATE public.payments SET status = 'approved' WHERE id = %s",
@@ -2399,37 +2408,27 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 (subscription_id,)
             )
             conn.commit()
-            await query.edit_message_text("✅ ክፍያ ተቀበለ።\n\n🚀 ተቀበለ!")
-            # Fetch orders for detailed message
-            cur.execute(
-                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
-                (subscription_id,)
-            )
-            orders = cur.fetchall()
-            detailed_text = f"📢 የክፍያ ማረጋገጫ መልእክት!\n\n"
-            detailed_text += f"✅ ክፍያዎ {amount:.2f} ብር ተቀበለ!\n\n"
-            detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n\n"
+            await query.edit_message_text("✅ ክፍያ ተቀበለ።\n🚀 ተቀበለ!")
+
+            # Build detailed confirmation message
+            detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
+            detailed_text += f"✅ ክፍያዎ {amount:.2f} ብር ተቀበለ!\n"
+            detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
             for meal_date, items_json in orders:
                 items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                detailed_text += f"{meal_date}: "
-                for item in items:
-                    detailed_text += f"{item['name']} ({item['price']:.2f} ብር) "
-                detailed_text += "\n\n"
-            detailed_text += f"💰 ጠቅላላ መጠን: {amount:.2f} ብር\n\n"
-            detailed_text += "🍴 ምግቦችዎ ዝግጁ ይሆናሉ!\n\n🚀 ተጠናቅቀው በደህና!"
+                detailed_text += f"📅 {meal_date}: "
+                item_details = ", ".join([f"{item['name']} ({item['price']:.2f} ብር)" for item in items])
+                detailed_text += f"{item_details}\n"
+            detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
+            detailed_text += "🍴 ምግቦችዎ ዝግጁ ይሆናሉ!\n🚀 ተጠናቅቀው በደህና!"
             await context.bot.send_message(
                 chat_id=user_id,
                 text=detailed_text,
                 reply_markup=get_main_keyboard(user_id)
             )
+
         elif action == 'reject':
-            # Fetch orders before deleting
-            cur.execute(
-                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
-                (subscription_id,)
-            )
-            orders = cur.fetchall()
-            # Delete
+            # Delete associated orders and subscription
             cur.execute(
                 "UPDATE public.payments SET status = 'rejected' WHERE id = %s",
                 (payment_id,)
@@ -2443,20 +2442,20 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 (subscription_id,)
             )
             conn.commit()
-            await query.edit_message_text("❌ ክፍያ ተውደቀ።\n\n🚫 ተውደቀ!")
-            # Build detailed reject message
-            detailed_text = f"📢 የክፍያ ማረጋገጫ መልእክት!\n\n"
-            detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n\n"
+            await query.edit_message_text("❌ ክፍያ ተውደቀ።\n🚫 ተውደቀ!")
+
+            # Build detailed rejection message
+            detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
+            detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n"
             if orders:
-                detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n\n"
+                detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
                 for meal_date, items_json in orders:
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                    detailed_text += f"{meal_date}: "
-                    for item in items:
-                        detailed_text += f"{item['name']} ({item['price']:.2f} ብር) "
-                    detailed_text += "\n\n"
-            detailed_text += f"💰 ጠቅላላ መጠን: {amount:.2f} ብር\n\n"
-            detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n\n"
+                    detailed_text += f"📅 {meal_date}: "
+                    item_details = ", ".join([f"{item['name']} ({item['price']:.2f} ብር)" for item in items])
+                    detailed_text += f"{item_details}\n"
+            detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
+            detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n"
             detailed_text += "🔄 እንደገና ይጀምሩ!"
             await context.bot.send_message(
                 chat_id=user_id,
@@ -2465,13 +2464,12 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             )
     except Exception as e:
         logger.error(f"Error processing payment callback for payment {payment_id}: {e}")
-        await query.edit_message_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
+        await query.edit_message_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት።\n🔄 እባክዎ እንደገና ይሞክሩ።")
     finally:
         if cur:
             cur.close()
         if conn:
             conn.close()
-
 # My Subscription → My Info (keep as subscription details)
 async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
