@@ -980,7 +980,7 @@ async def register_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return REGISTER_LOCATION
     except Exception as e:
         logger.error(f"Error saving phone for user {user.id}: {e}")
-        await update.message.reply_text("❌ ስልክ ቁጥር በማስ���መጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+        await update.message.reply_text("❌ ስልክ ቁጥር በማስቀመጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return REGISTER_PHONE
     finally:
         if cur:
