@@ -912,7 +912,7 @@ async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return REGISTER_PHONE
     except Exception as e:
         logger.error(f"Error saving name for user {user.id}: {e}")
-        await update.message.reply_text("❌ ስም በማስቀመጥ ላይ ስህተት ተከ��ቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+        await update.message.reply_text("❌ ስም በማስቀመጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return REGISTER_NAME
     finally:
         if cur:
@@ -1924,7 +1924,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(
                         chat_id=admin_id,
                         text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
-                             f"⚠️ የማረጋጫ URL የለም: {receipt_url}\n\n"
+                             f"⚠️ የማረጋገጫ URL የለም: {receipt_url}\n\n"
                              "🔧 ለማረጋጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
@@ -1949,8 +1949,8 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(
                         chat_id=admin_id,
                         text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
-                             f"⚠️ የማረጋጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
-                             f"🔗 የማረጋጫ URL: {receipt_url}\n\n"
+                             f"⚠️ የማረጋገጥ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
+                             f"🔗 የማረጋገጥ URL: {receipt_url}\n\n"
                              "🔧 ለማረጋጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
@@ -2128,8 +2128,10 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 for meal_date, items_json, order_created in orders:
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
                     orders_text += f"  - Date Ordered: {meal_date} (Order Date: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
+                    item_list = []
                     for item in items:
-                        orders_text += f"    * {item['name']} ------- {item['price']:.2f} ETB<br/>"
+                        item_list.append(f"{item['name']} — {int(item['price'])}ETB")
+                    orders_text += f"    * {', '.join(item_list)}<br/>"
             else:
                 orders_text += "None"
             p_orders = Paragraph(orders_text, amharic_style)  # Use Amharic style for food names
@@ -2338,7 +2340,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                             text=f"💳 ክፍያ #{payment_id}\n\n"
                                  f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
                                  f"💰 መጠን: {amount:.2f} ብር\n\n"
-                                 f"🔗 የማረጋገጫ URL: {receipt_url}\n\n"
+                                 f"🔗 የማረጋገጥ URL: {receipt_url}\n\n"
                                  f"(⚠️ ማሳወቂያ: ስቶ ማሳየት ስህተት ተከሰተ: {str(e)})\n\n"
                                  "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                             reply_markup=reply_markup
@@ -2349,7 +2351,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                         text=f"💳 ክፍያ #{payment_id}\n\n"
                              f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
                              f"💰 መጠን: {amount:.2f} ብር\n\n"
-                             f"🔗 የማረጋገጫ URL: {receipt_url or 'የለም'} (የማይሰራ ወይም የለም URL)\n\n"
+                             f"🔗 የማረጋገጥ URL: {receipt_url or 'የለም'} (የማይሰራ ወይም የለም URL)\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=reply_markup
                     )
