@@ -1876,8 +1876,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return PAYMENT_UPLOAD
     photo = update.message.photo[-1]
-    file = await photo.get_file()
-    receipt_url = file.file_path
+    receipt_url = photo.file_id
     conn = None
     cur = None
     try:
@@ -1919,19 +1918,6 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         for admin_id in ADMIN_IDS:
             try:
-                if not validators.url(receipt_url):
-                    logger.warning(f"Invalid receipt URL for payment {payment_id}: {receipt_url}")
-                    await context.bot.send_message(
-                        chat_id=admin_id,
-                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
-                             f"⚠️ የማረጋገጫ URL የለም: {receipt_url}\n\n"
-                             "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
-                        reply_markup=InlineKeyboardMarkup([
-                            [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
-                             InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
-                        ])
-                    )
-                    continue
                 try:
                     await context.bot.send_photo(
                         chat_id=admin_id,
@@ -1950,7 +1936,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         chat_id=admin_id,
                         text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
                              f"⚠️ የማረጋገጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
-                             f"🔗 የማረጋገጫ URL: {receipt_url}\n\n"
+                             f"🔗 የማረጋገጫ File ID: {receipt_url}\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
@@ -2321,7 +2307,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             try:
-                if receipt_url and validators.url(receipt_url):
+                if receipt_url:
                     try:
                         await context.bot.send_photo(
                             chat_id=user.id,
@@ -2339,7 +2325,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                             text=f"💳 ክፍያ #{payment_id}\n\n"
                                  f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
                                  f"💰 መጠን: {amount:.2f} ብር\n\n"
-                                 f"🔗 የማረጋገጫ URL: {receipt_url}\n\n"
+                                 f"🔗 የማረጋገጫ File ID: {receipt_url}\n\n"
                                  f"(⚠️ ማሳወቂያ: ስቶ ማሳየት ስህተት ተከሰተ: {str(e)})\n\n"
                                  "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                             reply_markup=reply_markup
@@ -2350,7 +2336,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                         text=f"💳 ክፍያ #{payment_id}\n\n"
                              f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
                              f"💰 መጠን: {amount:.2f} ብር\n\n"
-                             f"🔗 የማረጋገጫ URL: {receipt_url or 'የለም'} (የማይሰራ ወይም የለም URL)\n\n"
+                             f"🔗 የማረጋገጫ File ID: {receipt_url or 'የለም'}\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=reply_markup
                     )
@@ -2719,34 +2705,34 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not payments:
             await update.message.reply_text("❌ ክፍያዎች አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
+        await update.message.reply_text("💸 የክፍያ ታሪክ:")
         for payment_id, full_name, username, amount, status, created_at, receipt_url in payments:
             caption = (
                 f"💳 ክፍያ #{payment_id}\n\n"
                 f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n\n"
                 f"💰 መጠን: {amount:.2f} ብር\n\n"
                 f"✅ ሁኔታ: {status.capitalize()}\n\n"
-                f"📅 ቀን: {created_at.strftime('%Y-%m-%d %H:%M')}\n\n"
-                f"🔗 ማረጋገጫ: {receipt_url or 'የለም'}"
+                f"📅 ቀን: {created_at.strftime('%Y-%m-%d %H:%M')}"
             )
-            try:
-                if receipt_url and validators.url(receipt_url):
+            if receipt_url:
+                try:
                     await context.bot.send_photo(
                         chat_id=user.id,
                         photo=receipt_url,
                         caption=caption
                     )
-                else:
+                except Exception as e:
+                    logger.error(f"Error sending photo for payment {payment_id}: {e}")
                     await context.bot.send_message(
                         chat_id=user.id,
-                        text=caption
+                        text=f"{caption}\n\n🔗 File ID: {receipt_url}"
                     )
-            except Exception as e:
-                logger.error(f"Error sending payment history for {payment_id}: {e}")
+            else:
                 await context.bot.send_message(
                     chat_id=user.id,
-                    text=caption + f"\n\n⚠️ ስህተት: ማሳየት አልተሳካም ({str(e)})"
+                    text=caption
                 )
-        await update.message.reply_text("✅ የክፍያ ታሪክ ተመልክቷል (በተቻለ ምስሎች ጋር)!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("────────────", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching payments: {e}")
