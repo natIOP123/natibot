@@ -1497,7 +1497,7 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         selected_dates_en = json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json
         if meals_remaining <= 0 or not selected_dates_en:
             await update.message.reply_text(
-                "❌ በምዝገባዎ ውስጥ ምንም ቀሪ ምግቦች ወይም የተመረጡ ቀናት የሉም።\n\n"
+                "❌ በምዝገባዎ ውስጥ ምንም ቀሪ ምግቦች ወይም የተመረጡ ቀን የሉም።\n\n"
                 "🛒 እባክዎ አዲስ እቅድ ይመዝገቡ።\n\n"
                 "🔄 እንደገና ይሞክሩ!",
                 reply_markup=get_main_keyboard(user.id)
@@ -2420,7 +2420,8 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             detailed_text += "🍴 ምግቦችዎ ዝግጁ ይሆናሉ!\n\n🚀 ተጠናቅቀው በደህና!"
             await context.bot.send_message(
                 chat_id=user_id,
-                text=detailed_text
+                text=detailed_text,
+                reply_markup=get_main_keyboard(user_id)
             )
             # Send help text
             fake_update = Update(0, message=type('obj', (object,), {'effective_user': type('obj', (object,), {'id': user_id})}))
@@ -2576,11 +2577,11 @@ async def admin_delete_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "SELECT menu_items FROM public.weekly_menus WHERE week_start_date = %s",
             (week_start,)
         )
-        menu = cur.fetchone()
-        if not menu:
+        menu_result = cur.fetchone()
+        if not menu_result:
             await update.message.reply_text("❌ ለዚህ ሳምንቹ ምግብ ዝርዝር አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
-        menu_items = json.loads(menu[0]) if isinstance(menu[0], str) else menu[0]
+        menu_items = json.loads(menu_result[0]) if isinstance(menu_result[0], str) else menu_result[0]
         if not menu_items:
             await update.message.reply_text("❌ ምግብ ዝርዝሩ ባዶ ነው።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
@@ -2802,7 +2803,7 @@ async def admin_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     await update.message.reply_text(
-        "📢 ለሁሉም ተጠቃሚዎች ለማስተላለፍ መልእክቹ ያስገቡ:\n\n"
+        "📢 ለሁሉም ተጠቃሚዎች ለማስተላለፍ ለማስተላለፍ መልእክቹ ያስገቡ:\n\n"
         "🔧 መልእክት ያስገቡ!\n\n"
         "🚀 ማስታወቂያ ያልፉ!",
         reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
