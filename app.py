@@ -2387,7 +2387,10 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         )
         payment = cur.fetchone()
         if not payment:
-            await query.edit_message_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n🔄 እንደገና ይመልከቱ!")
+            try:
+                await query.edit_message_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n🔄 እንደገና ይመልከቱ!")
+            except:
+                await query.message.reply_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n🔄 እንደገና ይመልከቱ!")
             return
 
         user_id, subscription_id, amount = payment
@@ -2409,9 +2412,18 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 (subscription_id,)
             )
             conn.commit()
-            await query.edit_message_text("✅ ክፍያ ተቀበለ።\n🚀 ተቀበለ!")
 
-            # Build confirmation message
+            # Notify admin (edit original message safely)
+            try:
+                await query.edit_message_text("✅ ክፍያ ተቀበለ።\n🚀 ተቀበለ!")
+            except Exception as e:
+                logger.warning(f"Could not edit admin message: {e}")
+                try:
+                    await query.message.reply_text("✅ ክፍያ ተቀበለ።\n🚀 ተቀበለ!")
+                except:
+                    pass
+
+            # Build confirmation message for USER
             detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
             detailed_text += f"✅ ክፍያዎ {amount:.2f} ብር ተቀበለ!\n"
             detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
@@ -2438,6 +2450,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             detailed_text += "🍴 ምግቦችዎ ዝግጁ ይሆናሉ!\n"
             detailed_text += "🚀 ተጠናቅቀው በደህና!"
 
+            # Send to USER
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
@@ -2446,11 +2459,9 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 )
             except Exception as send_err:
                 logger.error(f"Failed to send approval message to user {user_id}: {send_err}")
-                # Still succeed admin-side
-                pass
 
         elif action == 'reject':
-            # Fetch orders before deletion
+            # Fetch before deletion
             cur.execute(
                 "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
                 (subscription_id,)
@@ -2461,8 +2472,18 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             cur.execute("DELETE FROM public.orders WHERE subscription_id = %s", (subscription_id,))
             cur.execute("DELETE FROM public.subscriptions WHERE id = %s", (subscription_id,))
             conn.commit()
-            await query.edit_message_text("❌ ክፍያ ተውደቀ።\n🚫 ተውደቀ!")
 
+            # Notify admin
+            try:
+                await query.edit_message_text("❌ ክፍያ ተውደቀ።\n🚫 ተውደቀ!")
+            except Exception as e:
+                logger.warning(f"Could not edit admin message: {e}")
+                try:
+                    await query.message.reply_text("❌ ክፍያ ተውደቀ።\n🚫 ተውደቀ!")
+                except:
+                    pass
+
+            # Build rejection message for USER
             detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
             detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n"
 
@@ -2489,6 +2510,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n"
             detailed_text += "🔄 እንደገና ይጀምሩ!"
 
+            # Send to USER
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
@@ -2497,11 +2519,13 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 )
             except Exception as send_err:
                 logger.error(f"Failed to send rejection message to user {user_id}: {send_err}")
-                pass
 
     except Exception as e:
         logger.error(f"Error processing payment callback for payment {payment_id}: {e}")
-        await query.edit_message_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት።\n🔄 እባክዎ እንደገና ይሞክሩ።")
+        try:
+            await query.edit_message_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት።\n🔄 እባክዎ እንደገና ይሞክሩ።")
+        except:
+            await query.message.reply_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት።\n🔄 እባክዎ እንደገና ይሞክሩ።")
     finally:
         if cur:
             cur.close()
