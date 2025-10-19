@@ -1497,7 +1497,7 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         selected_dates_en = json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json
         if meals_remaining <= 0 or not selected_dates_en:
             await update.message.reply_text(
-                "❌ በምዝገባዎ ውስጥ ምንም ቀሪ ምግቦች ወይም የተመረጡ ቀን የሉም።\n\n"
+                "❌ በምዝገባዎ ውስጥ ምንም ቀሪ ምግቦች ወይም የተመረጡ ቀናት የሉም።\n\n"
                 "🛒 እባክዎ አዲስ እቅድ ይመዝገቡ።\n\n"
                 "🔄 እንደገና ይሞክሩ!",
                 reply_markup=get_main_keyboard(user.id)
@@ -2071,13 +2071,13 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # Fetch payments for this sub
             cur.execute("""
-                SELECT id, amount, created_at, status, receipt_url
+                SELECT amount, created_at, status
                 FROM public.payments
                 WHERE subscription_id = %s
                 ORDER BY created_at DESC
             """, (sub_id,))
             payments = cur.fetchall()
-            total_paid = sum(amount for _, amount, _, _, _ in payments) if payments else 0.0
+            total_paid = sum(amount for amount, _, _ in payments) if payments else 0.0
 
             # Fetch orders for this sub
             cur.execute("""
@@ -2107,12 +2107,9 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Payments (English)
             payments_text = "<b>Payments:</b><br/>"
             if payments:
-                for payment_id, amount, paid_date, status, receipt_url in payments:
+                for amount, paid_date, status in payments:
                     status_trans = 'Pending' if status == 'pending' else 'Approved' if status == 'approved' else 'Rejected'
                     payments_text += f"  - Amount: {amount:.2f} ETB | Date Paid: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status: {status_trans}<br/>"
-                    if receipt_url:
-                        full_receipt_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{receipt_url}"
-                        payments_text += f"    <a href='{full_receipt_url}'>View Receipt Image</a><br/>"
                 payments_text += f"<br/>  <b>Total Paid:</b> {total_paid:.2f} ETB"
                 payments_text += f"<br/>  <b>Payment History Telegram API Link:</b> <a href='https://api.telegram.org/bot{BOT_TOKEN}/sendMessage?chat_id={telegram_id}&text=/admin_payments'>View Payment History</a>"
             else:
@@ -2536,7 +2533,7 @@ async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     await update.message.reply_text(
-        "📋 አዲልሱን ምግብ ዝርዝር በJSON ቅርጽ ያስገቡ (ለምሳሌ፣ [{'id': 1, 'name': 'Dish', 'price': 100, 'day': 'Monday', 'category': 'fasting'}])።\n\n"
+        "📋 አዲሱን ምግብ ዝርዝር በJSON ቅርጽ ያስገቡ (ለምሳሌ፣ [{'id': 1, 'name': 'Dish', 'price': 100, 'day': 'Monday', 'category': 'fasting'}])።\n\n"
         "🔧 JSON ቅርጽ ያስገቡ!\n\n"
         "🚀 ዝርዝር ያዘምኑ!",
         reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
@@ -2909,7 +2906,7 @@ async def view_locations(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         locations = cur.fetchall()
         if not locations:
-            await update.message.reply_text("❌ የተጋሩ ቦታዎች የሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ የተዘጋጁ ቦታዎች የሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
         for key, value in locations:
             admin_id = key.replace('admin_location_', '')
