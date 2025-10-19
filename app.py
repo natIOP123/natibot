@@ -2389,9 +2389,10 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
         if not payment:
             await query.edit_message_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n🔄 እንደገና ይመልከቱ!")
             return
+
         user_id, subscription_id, amount = payment
 
-        # Fetch selected meals for the subscription
+        # Fetch orders for detailed message
         cur.execute(
             "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
             (subscription_id,)
@@ -2410,58 +2411,94 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             conn.commit()
             await query.edit_message_text("✅ ክፍያ ተቀበለ።\n🚀 ተቀበለ!")
 
-            # Build detailed confirmation message
+            # Build confirmation message
             detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
             detailed_text += f"✅ ክፍያዎ {amount:.2f} ብር ተቀበለ!\n"
             detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
-            for meal_date, items_json in orders:
-                items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                detailed_text += f"📅 {meal_date}: "
-                item_details = ", ".join([f"{item['name']} ({item['price']:.2f} ብር)" for item in items])
-                detailed_text += f"{item_details}\n"
+
+            if not orders:
+                detailed_text += "   (ምግቦች አልተገኙም)\n"
+            else:
+                for meal_date, items_json in orders:
+                    try:
+                        items = json.loads(items_json) if isinstance(items_json, str) else items_json
+                        if not isinstance(items, list):
+                            items = [items]
+                        item_lines = []
+                        for item in items:
+                            name = item.get('name', 'ያልታወቀ ምግብ')
+                            price = item.get('price', 0)
+                            item_lines.append(f"{name} ({price:.2f} ብር)")
+                        detailed_text += f"📅 {meal_date}: {', '.join(item_lines)}\n"
+                    except Exception as parse_err:
+                        logger.error(f"Failed to parse items for order on {meal_date}: {parse_err}")
+                        detailed_text += f"📅 {meal_date}: (ስህተት በምግብ ዝርዝር)\n"
+
             detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
-            detailed_text += "🍴 ምግቦችዎ ዝግጁ ይሆናሉ!\n🚀 ተጠናቅቀው በደህና!"
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=detailed_text,
-                reply_markup=get_main_keyboard(user_id)
-            )
+            detailed_text += "🍴 ምግቦችዎ ዝግጁ ይሆናሉ!\n"
+            detailed_text += "🚀 ተጠናቅቀው በደህና!"
+
+            try:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=detailed_text,
+                    reply_markup=get_main_keyboard(user_id)
+                )
+            except Exception as send_err:
+                logger.error(f"Failed to send approval message to user {user_id}: {send_err}")
+                # Still succeed admin-side
+                pass
 
         elif action == 'reject':
-            # Delete associated orders and subscription
+            # Fetch orders before deletion
             cur.execute(
-                "UPDATE public.payments SET status = 'rejected' WHERE id = %s",
-                (payment_id,)
-            )
-            cur.execute(
-                "DELETE FROM public.orders WHERE subscription_id = %s",
+                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
                 (subscription_id,)
             )
-            cur.execute(
-                "DELETE FROM public.subscriptions WHERE id = %s",
-                (subscription_id,)
-            )
+            orders_before_delete = cur.fetchall()
+
+            cur.execute("UPDATE public.payments SET status = 'rejected' WHERE id = %s", (payment_id,))
+            cur.execute("DELETE FROM public.orders WHERE subscription_id = %s", (subscription_id,))
+            cur.execute("DELETE FROM public.subscriptions WHERE id = %s", (subscription_id,))
             conn.commit()
             await query.edit_message_text("❌ ክፍያ ተውደቀ።\n🚫 ተውደቀ!")
 
-            # Build detailed rejection message
             detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
             detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n"
-            if orders:
+
+            if orders_before_delete:
                 detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
-                for meal_date, items_json in orders:
-                    items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                    detailed_text += f"📅 {meal_date}: "
-                    item_details = ", ".join([f"{item['name']} ({item['price']:.2f} ብር)" for item in items])
-                    detailed_text += f"{item_details}\n"
+                for meal_date, items_json in orders_before_delete:
+                    try:
+                        items = json.loads(items_json) if isinstance(items_json, str) else items_json
+                        if not isinstance(items, list):
+                            items = [items]
+                        item_lines = []
+                        for item in items:
+                            name = item.get('name', 'ያልታወቀ ምግብ')
+                            price = item.get('price', 0)
+                            item_lines.append(f"{name} ({price:.2f} ብር)")
+                        detailed_text += f"📅 {meal_date}: {', '.join(item_lines)}\n"
+                    except Exception as parse_err:
+                        logger.error(f"Failed to parse items for rejected order on {meal_date}: {parse_err}")
+                        detailed_text += f"📅 {meal_date}: (ስህተት በምግብ ዝርዝር)\n"
+            else:
+                detailed_text += "   (ምግቦች አልተገኙም)\n"
+
             detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
             detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n"
             detailed_text += "🔄 እንደገና ይጀምሩ!"
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=detailed_text,
-                reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
-            )
+
+            try:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=detailed_text,
+                    reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
+                )
+            except Exception as send_err:
+                logger.error(f"Failed to send rejection message to user {user_id}: {send_err}")
+                pass
+
     except Exception as e:
         logger.error(f"Error processing payment callback for payment {payment_id}: {e}")
         await query.edit_message_text("❌ የክፍያ እርምጃ በማስተካከል ላይ ስህተት።\n🔄 እባክዎ እንደገና ይሞክሩ።")
