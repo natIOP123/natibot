@@ -1169,7 +1169,7 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
         if user.id in ADMIN_IDS:
             await update.message.reply_text(
                 "✅ ምዝገባ ተጠናቅቋል!\n\n"
-                "🔐 እንደ አስተዳዳሪ ወደ ዋና ገጽ ተመለላል።\n\n"
+                "🔐 እንደ አስተዳዳሪ ወደ ዋና ገጽ ተመለላላል።\n\n"
                 "🚀 አስተዳዳሪ ተመልከት!",
                 reply_markup=get_main_keyboard(user.id)
             )
@@ -1284,9 +1284,9 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = [days_to_show[i:i+3] for i in range(0, len(days_to_show), 3)]
             keyboard.append(['ጨርስ', '🔙 ተመለስ'])
             await update.message.reply_text(
-                "❌ ቢያንስ አንድ ቀን ይምረጡ።\n\n"
-                "📅 ቢያንስ አንድ ቀን ይምረጡ!\n\n"
-                "🔄 ቀናት ይምረጡ!",
+                "❌ ቢያንስ አንድ ቀን ይምረጠው።\n\n"
+                "📅 ቢያንስ አንድ ቀን ይምረጠው!\n\n"
+                "🔄 ቀናት ይምረጠው!",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
             return CHOOSE_DATE
@@ -1335,8 +1335,8 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             fasting_items = [item for item in menu_items if item['category'] == 'fasting']
             non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
             menu_text = (
-                f"📜 ለ{first_day} ምግብ ይምረጡ:\n\n"
-                f"📅 የተመረጡ ቀናት: {', '.join(selected_dates)}\n\n"
+                f"📜 ለ{first_day} ምግብ ይምረጠው:\n\n"
+                f"📅 የተመረጠው ቀናት: {', '.join(selected_dates)}\n\n"
                 f"🍽 ቀሪ ምግቦች: {len(selected_dates)}\n\n"
                 f"🍲 የጾም ምግብ ዝርዝር:\n\n"
             )
@@ -1382,8 +1382,8 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append(['ጨርስ', '🔙 ተመለስ'])
             await update.message.reply_text(
                 f"❌ {choice} ቀደም ብሎ ታክሏል።\n\n"
-                "📅 እባክዎ ሌላ ቀን ይምረጡ ወይም 'ጨርስ' ይጫኑ።\n\n"
-                "🔄 ቀናት ይምረጡ!",
+                "📅 እባክዎ ሌላ ቀን ይምረጠው ወይም 'ጨርስ' ይጫኑ።\n\n"
+                "🔄 ቀናት ይምረጠው!",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
             return CHOOSE_DATE
@@ -1394,8 +1394,8 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append(['ጨርስ', '🔙 ተመለስ'])
         await update.message.reply_text(
             f"✅ {choice} ተታክሏል።\n\n"
-            "📅 ተጨማሪ ቀና቉ ይምረጡ ወይም 'ጨርስ' ይጫኑ።\n\n"
-            "🚀 ቀናት ይምረጡ!",
+            "📅 ተጨማሪ ቀና቉ ይምረጠው ወይም 'ጨርስ' ይጫኑ።\n\n"
+            "🚀 ቀናት ይምረጠው!",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return CHOOSE_DATE
@@ -1405,8 +1405,8 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append(['ጨርስ', '🔙 ተመለስ'])
         await update.message.reply_text(
             "❌ የማይሰራ ምርጫ።\n\n"
-            "📅 እባክዎ ቀን ወይም 'ጨርስ' ይምረጡ።\n\n"
-            "🔄 ትክክለኛ ምርጫ ይምረጡ!",
+            "📅 እባክዎ ቀን ወይም 'ጨርስ' ይምረጠው።\n\n"
+            "🔄 ትክክለኛ ምርጫ ይምረጠው!",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return CHOOSE_DATE
@@ -1439,7 +1439,7 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         if not valid_items:
             await update.message.reply_text(
-                "❌ በዚሚ ሳምንት የታቀዘ ምግቦች የሉም።\n\n"
+                "❌ በዚህ ሳምንት የታቀዘ ምግቦች የሉም።\n\n"
                 "🔄 እባክዎ እንደገና ይሞክሩ!",
                 reply_markup=get_main_keyboard(update.effective_user.id)
             )
@@ -1568,7 +1568,7 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     text = update.message.text.strip()
     menu_items = context.user_data.get('menu_items', [])
@@ -1612,7 +1612,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
     if text == 'ጨርስ':
         if len(selected_meals.get(current_day, [])) == 0:
             menu_shown = context.user_data.get('menu_shown', False)
-            prompt = f"❌ ለ{current_day} ቢያንስ አንድ ምግብ ይምረጡ።\n\n"
+            prompt = f"❌ ለ{current_day} ቢያንስ አንድ ምግብ ይምረጠው።\n\n"
             if menu_shown:
                 prompt += f"🔢 ለ{current_day} ቁጥል ያስገቡ (1-{len(menu_items)}):\n\n"
             else:
@@ -1645,7 +1645,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             fasting_items = [item for item in menu_items if item['category'] == 'fasting']
             non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
             next_prompt = (
-                f"📜 ለ{next_day} ምግብ ይምረጡ:\n\n"
+                f"📜 ለ{next_day} ምግብ ይምረጠው:\n\n"
                 "🍲 የጾም ምግብ ዝርዝር:\n\n"
             )
             for idx, item in enumerate(fasting_items, 1):
@@ -1693,7 +1693,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
                 fasting_items = [item for item in menu_items if item['category'] == 'fasting']
                 non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
                 next_prompt = (
-                    f"📜 ለ{next_day} ምግብ ይምረጡ:\n\n"
+                    f"📜 ለ{next_day} ምግብ ይምረጠው:\n\n"
                     "🍲 የጾም ምግብ ዝርዝር:\n\n"
                 )
                 for idx, item in enumerate(fasting_items, 1):
@@ -1715,7 +1715,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             menu_shown = context.user_data.get('menu_shown', False)
             error_prompt = f"❌ የማይሰራ የምግብ ቁጥል {text}።\n\n"
             if menu_shown:
-                error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጡ።\n\n"
+                error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጠው።\n\n"
             else:
                 fasting_items = [item for item in menu_items if item['category'] == 'fasting']
                 non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
@@ -1725,7 +1725,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
                 error_prompt += "🍖 የፍስክ ምግብ ዝርዝር:\n\n"
                 for idx, item in enumerate(non_fasting_items, 1):
                     error_prompt += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
-                error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጡ።\n\n"
+                error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጠው።\n\n"
                 context.user_data['menu_shown'] = True
             error_prompt += "🔄 ትክክለኛ ቁጥል ያስገቡ!"
             await update.message.reply_text(
@@ -1810,8 +1810,8 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         fasting_items = [item for item in menu_items if item['category'] == 'fasting']
         non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
         menu_text = (
-            f"📜 ለመረጡት ቀናት ምግቦች እንደገና ይምረጡ:\n\n"
-            f"📅 የተመረጡ ቀናት: {', '.join(selected_dates)}\n\n"
+            f"📜 ለመረጡት ቀናት ምግቦች እንደገና ይምረጠው:\n\n"
+            f"📅 የተመረጠው ቀናት: {', '.join(selected_dates)}\n\n"
         )
         if not menu_shown:
             menu_text += "🍲 የጾም ምግብ ዝርዝር:\n\n"
@@ -1832,8 +1832,8 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return MEAL_SELECTION
     if update.message.text != '✅ የምግብ ዝርዝሩ ትክክል ነዋ':
         await update.message.reply_text(
-            "❌ እባክዎ '✅ የምግብ ዝርዝሩ ትክክል ነዋ' ወይም '⛔ አስተካክል' ይምረጡ።\n\n"
-            "🔄 ትክክለኛ ምርጫ ይምረጡ!",
+            "❌ እባክዎ '✅ የምግብ ዝርዝሩ ትክክል ነዋ' ወይም '⛔ አስተካክል' ይምረጠው።\n\n"
+            "🔄 ትክክለኛ ምርጫ ይምረጠው!",
             reply_markup=ReplyKeyboardMarkup(
                 [['✅ የምግብ ዝርዝሩ ትክክል ነዋ', '⛔ አስተካክል'], ['ሰርዝ', '🔙 ተመለስ']],
                 resize_keyboard=True
@@ -1924,8 +1924,8 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(
                         chat_id=admin_id,
                         text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
-                             f"⚠️ የማረጋጫ URL የለም: {receipt_url}\n\n"
-                             "🔧 ለማረጋጥ ወይም ለመሰረዝ ይመርጡ!",
+                             f"⚠️ የማረጋገጫ URL የለም: {receipt_url}\n\n"
+                             "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
                              InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
@@ -1949,9 +1949,9 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(
                         chat_id=admin_id,
                         text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
-                             f"⚠️ የማረጋጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
-                             f"🔗 የማረጋጫ URL: {receipt_url}\n\n"
-                             "🔧 ለማረጋጥ ወይም ለመሰረዝ ይመርጡ!",
+                             f"⚠️ የማረጋገጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
+                             f"🔗 የማረጋገጫ URL: {receipt_url}\n\n"
+                             "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
                              InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
@@ -2035,6 +2035,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f.write(response.content)
                 logger.info("Font downloaded successfully.")
             pdfmetrics.registerFont(TTFont('Amharic', font_path))
+            pdfmetrics.registerFont(TTFont('Amharic-Bold', font_path.replace('Regular', 'Bold')))
             amharic_style = ParagraphStyle(
                 'AmharicStyle',
                 parent=styles['Normal'],
@@ -2110,6 +2111,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     status_trans = 'Pending' if status == 'pending' else 'Approved' if status == 'approved' else 'Rejected'
                     payments_text += f"  - Amount: {amount:.2f} ETB | Date Paid: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status: {status_trans}<br/>"
                 payments_text += f"<br/>  <b>Total Paid:</b> {total_paid:.2f} ETB"
+                payments_text += f"<br/>  <b>Payment History Telegram API Link:</b> <a href='https://api.telegram.org/bot{BOT_TOKEN}/sendMessage?chat_id={telegram_id}&text=/admin_payments'>View Payment History</a>"
             else:
                 payments_text += "None"
             p_payments = Paragraph(payments_text, english_style)
@@ -2122,17 +2124,17 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             story.append(p_dates)
             story.append(Spacer(1, 0.2 * inch))
 
-            # Orders (English labels, Amharic food names in updated format)
+            # Orders (English labels, no Amharic food names)
             orders_text = f"<b>Food Ordered (Total Value: {total_order_price:.2f} ETB):</b><br/>"
             if orders:
                 for meal_date, items_json, order_created in orders:
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
                     orders_text += f"  - Date Ordered: {meal_date} (Order Date: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
                     for item in items:
-                        orders_text += f"    * {item['price']:.2f} ETB - {item['name']}<br/>"
+                        orders_text += f"    * {item['price']:.2f} ETB - Selected Meal ({item['category']})<br/>"
             else:
                 orders_text += "None"
-            p_orders = Paragraph(orders_text, amharic_style)  # Use Amharic style for food names
+            p_orders = Paragraph(orders_text, english_style)
             story.append(p_orders)
 
             story.append(Spacer(1, 0.3 * inch))
@@ -2146,7 +2148,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id,
             document=open(report_filename, 'rb'),
             filename=report_filename,
-            caption="📄 Orders Report PDF Exported Successfully! (Food names in Amharic, details in English)"
+            caption="📄 Orders Report PDF Exported Successfully! (Details in English)"
         )
         os.remove(report_filename)  # Clean up
 
@@ -2510,7 +2512,7 @@ async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"⏰ የጊዜ ጫና: {expiry_date.strftime('%Y-%m-%d')}\n\n"
             f"✅ ሁኔታ: {status.capitalize()}\n\n"
             "🍴 ምግቦችዎን ለመምረጫ /select_meals ይጠቀሙ።\n\n"
-            "🚀 ምግቦችን ይምረጡ!"
+            "🚀 ምግቦችን ይምረጠው!"
         )
         await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
@@ -2632,7 +2634,7 @@ async def process_admin_delete_menu(update: Update, context: ContextTypes.DEFAUL
         if not (0 <= item_idx < len(menu_items)):
             await update.message.reply_text(
                 f"❌ የማይሰራ የንጥል ቁጥል።\n\n"
-                f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጡ።\n\n"
+                f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጠው።\n\n"
                 "🔄 ትክክለኛ ቁጥል ያስገቡ!",
                 reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
             )
