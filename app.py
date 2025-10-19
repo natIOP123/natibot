@@ -980,7 +980,7 @@ async def register_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return REGISTER_LOCATION
     except Exception as e:
         logger.error(f"Error saving phone for user {user.id}: {e}")
-        await update.message.reply_text("❌ ስልክ ቁጥር በማስቀመጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+        await update.message.reply_text("❌ ስልክ ቁጥር በማስ���መጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return REGISTER_PHONE
     finally:
         if cur:
@@ -1715,7 +1715,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             menu_shown = context.user_data.get('menu_shown', False)
             error_prompt = f"❌ የማይሰራ የምግብ ቁጥል {text}።\n\n"
             if menu_shown:
-                error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጠው።\n\n"
+                error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጠውፍ።\n\n"
             else:
                 fasting_items = [item for item in menu_items if item['category'] == 'fasting']
                 non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
@@ -1844,7 +1844,7 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_price = context.user_data.get('total_price', 0)
         if total_price <= 0:
             raise ValueError("Invalid total price")
-        order_text = f"💰 📝 ጠቅላላ ዋጋ: {total_price:.2f} ብር\n\n"
+        order_text = f"💰 📝 📝 ጠቅላላ ዋጋ: {total_price:.2f} ብር\n\n"
         order_text += "💳 ክፍያ ማረጋገጫ ምስል ያስገቡ ለመቀጠል።\n\n"
         order_text += "📤 ምስል ያስገቡ!"
         await update.message.reply_text(
@@ -2705,17 +2705,32 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not payments:
             await update.message.reply_text("❌ ክፍያዎች አልተገኘም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
-        text = "💸 የክፍያ ታሪክ:\n\n"
+        await update.message.reply_text("💸 የክፍያ ታሪክ እየተላከ ነው...", reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True))
         for payment_id, full_name, username, amount, status, created_at, receipt_url in payments:
-            text += f"💳 ክፍያ #{payment_id}\n"
-            text += f"👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n"
-            text += f"💰 መጠን: {amount:.2f} ብር\n"
-            text += f"✅ ሁኔታ: {status.capitalize()}\n"
-            text += f"📅 ቀን: {created_at.strftime('%Y-%m-%d %H:%M')}\n"
-            if receipt_url:
-                text += f"🔗 File ID: {receipt_url}\n"
-            text += "\n───\n\n"
-        await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
+            caption = f"💳 ክፍያ #{payment_id}\n\n👤 ተጠቃሚ: {full_name or 'የለም'} (@{username or 'የለም'})\n💰 መጠን: {amount:.2f} ብር\n✅ ሁኔታ: {status.capitalize()}\n📅 ቀን: {created_at.strftime('%Y-%m-%d %H:%M')}\n🔗 File ID: {receipt_url or 'የለም'}"
+            try:
+                if receipt_url:
+                    await context.bot.send_photo(
+                        chat_id=user.id,
+                        photo=receipt_url,
+                        caption=caption
+                    )
+                else:
+                    await context.bot.send_message(
+                        chat_id=user.id,
+                        text=caption
+                    )
+            except Exception as e:
+                logger.error(f"Error sending payment {payment_id} details: {e}")
+                await context.bot.send_message(
+                    chat_id=user.id,
+                    text=f"{caption}\n\n⚠️ ምስል ማሳየት ላይ ስህተት።"
+                )
+        await context.bot.send_message(
+            chat_id=user.id,
+            text="✅ የክፍያ ታሪክ ተመልክቷል!",
+            reply_markup=get_main_keyboard(user.id)
+        )
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error fetching payments: {e}")
@@ -2823,7 +2838,7 @@ async def process_admin_announce(update: Update, context: ContextTypes.DEFAULT_T
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error sending announcement: {e}")
-        await update.message.reply_text("❌ ማስ���ወቂያ በማላክ ላይ ስህተተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ ማስታወቂያ በማላክ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True))
         return ADMIN_ANNOUNCE
     finally:
         if cur:
