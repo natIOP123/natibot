@@ -510,7 +510,7 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await context.bot.send_message(
                     chat_id=admin_id,
-                    text=f"🔔 አዲስ ቦታ ጥያቄ ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
+                    text=f"🔔 አዲስ ቦታ ጥያቆ ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                     reply_markup=reply_markup
                 )
             except Exception as e:
@@ -1064,7 +1064,7 @@ async def confirm_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     await context.bot.send_message(
                         chat_id=admin_id,
-                        text=f"🔔 አዲስ ቦታ ጥያቄ ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
+                        text=f"🔔 አዲስ ቦታ ጥያቆ ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=reply_markup
                     )
                 except Exception as e:
@@ -2365,7 +2365,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
                     reply_markup=reply_markup
                 )
         await update.message.reply_text(
-            "💳 📷 ከላይ የቆዩ የክፍያ ጥያቄዎች ናቸው።\n\n"
+            "💳 📷 ከላይ የቆዩ የክፍያ ጥያቆዎች ናቸው።\n\n"
             "🔧 ለማረጋገጥ ወይም ለመሰረዝ አማራጮቹን ይጠቀሙ።\n\n"
             "🚀 እርምጃ ይወስዱ!",
             reply_markup=get_main_keyboard(user.id)
@@ -2993,7 +2993,7 @@ async def send_dinner_reminders(context: ContextTypes.DEFAULT_TYPE):
             for item in items:
                 message += f"🍴 {item['name']} - {item['price']:.2f} ብር\n"
             message += f"💰 ጠቅላላ ክፍል: {total_amount or 'የለም'} ብር\n\n"
-            message += "🚀 በደህና በታትተው ይጠቀ��!"
+            message += "🚀 በደህና በታትተው ይጠቀሙ!"
             try:
                 await context.bot.send_message(chat_id=user_id, text=message)
             except Exception as e:
