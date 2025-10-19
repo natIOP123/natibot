@@ -577,7 +577,7 @@ async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
             items = json.loads(items_json) if isinstance(items_json, str) else items_json
             for item in items:
                 total_price += item['price']
-                meal_details.append(f"{meal_date}: {item['name']}")
+                meal_details.append(f"{meal_date.strftime('%Y-%m-%d')}: {item['name']}")
         text = (
             f"🗓️ የተመዘገቡበት ቀን:\n\n"
             f"📅 {', '.join(selected_dates)}\n\n"
@@ -1169,7 +1169,7 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
         if user.id in ADMIN_IDS:
             await update.message.reply_text(
                 "✅ ምዝገባ ተጠናቅቋል!\n\n"
-                "🔐 እንደ አስተዳዳሪ ወደ ዋና ገጽ ተመለላላል።\n\n"
+                "🔐 እንደ አስተዳዳሪ ወደ ዋና ገጽ ተመልከት።\n\n"
                 "🚀 አስተዳዳሪ ተመልከት!",
                 reply_markup=get_main_keyboard(user.id)
             )
@@ -1676,7 +1676,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             }]
             context.user_data['selected_meals'] = selected_meals
             await update.message.reply_text(
-                f"✅ ለ{current_day} {item['name']} ተመረጠ።"
+                f"✅ ለ{current_day} {item['name']} ቉ተመረጠ።"
             )
             # Auto proceed to next day
             context.user_data['current_day_index'] = current_day_index + 1
@@ -1715,7 +1715,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             menu_shown = context.user_data.get('menu_shown', False)
             error_prompt = f"❌ የማይሰራ የምግብ ቁጥል {text}።\n\n"
             if menu_shown:
-                error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጠውፍ።\n\n"
+                error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጠውፍፍ።\n\n"
             else:
                 fasting_items = [item for item in menu_items if item['category'] == 'fasting']
                 non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
@@ -1735,7 +1735,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             return MEAL_SELECTION
     except ValueError:
         menu_shown = context.user_data.get('menu_shown', False)
-        error_prompt = f"❌ የማይሰራ ግብዓት '{text}'።\n\n"
+        error_prompt = f"❌ የማይሰራ ጊዛ '{text}'።\n\n"
         if menu_shown:
             error_prompt += f"🔢 ንጥል ያስገቡ (ለምሳሌ '1' 1-{len(menu_items)} መካከል):\n\n"
         else:
@@ -2041,7 +2041,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for user_row in users:
             user_id, telegram_id, full_name, phone_number, location, user_created = user_row
-            # Fetch subscription for this user (assume one active/pending)
+            # fetch subscription for this user (assume one active/pending)
             cur.execute("""
                 SELECT s.id, s.plan_type, s.meals_remaining, s.selected_dates, s.expiry_date, s.status, s.created_at as sub_created
                 FROM public.subscriptions s
@@ -2064,7 +2064,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             payments = cur.fetchall()
             total_paid = sum(amount for amount, _, _ in payments) if payments else 0.0
 
-            # Fetch orders for this sub
+            # fetch orders for this sub
             cur.execute("""
                 SELECT meal_date, items, created_at as order_created
                 FROM public.orders
@@ -2423,6 +2423,13 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 reply_markup=get_main_keyboard(user_id)
             )
         elif action == 'reject':
+            # Fetch orders before deleting
+            cur.execute(
+                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
+                (subscription_id,)
+            )
+            orders = cur.fetchall()
+            # Delete
             cur.execute(
                 "UPDATE public.payments SET status = 'rejected' WHERE id = %s",
                 (payment_id,)
@@ -2437,11 +2444,23 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             )
             conn.commit()
             await query.edit_message_text("❌ ክፍያ ተውደቀ።\n\n🚫 ተውደቀ!")
+            # Build detailed reject message
+            detailed_text = f"📢 የክፍያ ማረጋገጫ መልእክት!\n\n"
+            detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n\n"
+            if orders:
+                detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n\n"
+                for meal_date, items_json in orders:
+                    items = json.loads(items_json) if isinstance(items_json, str) else items_json
+                    detailed_text += f"{meal_date}: "
+                    for item in items:
+                        detailed_text += f"{item['name']} ({item['price']:.2f} ብር) "
+                    detailed_text += "\n\n"
+            detailed_text += f"💰 ጠቅላላ መጠን: {amount:.2f} ብር\n\n"
+            detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n\n"
+            detailed_text += "🔄 እንደገና ይጀምሩ!"
             await context.bot.send_message(
                 chat_id=user_id,
-                text="❌ ክፍያዎ ተሰርዟል።\n\n"
-                     "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n\n"
-                     "🔄 እንደገና ይጀምሩ!",
+                text=detailed_text,
                 reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
             )
     except Exception as e:
@@ -2743,7 +2762,7 @@ async def admin_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def admin_daily_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("❌ አስተዳዳሪዎች ማዘዋወር አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
     cur = None
@@ -2879,7 +2898,7 @@ async def process_set_admin_location(update: Update, context: ContextTypes.DEFAU
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error setting admin location: {e}")
-        await update.message.reply_text("❌ ቦታ በማዘጋጀት ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!\n\n🚀 እንደገና ይሞክሩ!", reply_markup=ReplyKeyboardMarkup([["ዝለል", '🔙 ተመለስ']], resize_keyboard=True))
+        await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return SET_ADMIN_LOCATION
     finally:
         if cur:
