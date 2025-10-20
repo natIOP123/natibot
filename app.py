@@ -2108,17 +2108,17 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             story.append(p_dates)
             story.append(Spacer(1, 0.2 * inch))
 
-            # Orders (English labels, no Amharic food names)
+            # Orders (English labels, Amharic food names)
             orders_text = f"<b>Food Ordered (Total Value: {total_order_price:.2f} ETB):</b><br/>"
             if orders:
                 for meal_date, items_json, order_created in orders:
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
                     orders_text += f"  - Date Ordered: {meal_date} (Order Date: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
                     for item in items:
-                        orders_text += f"    * {item['price']:.2f} ETB - Selected Meal ({item['category']})<br/>"
+                        orders_text += f"    * {item['name']} - {item['price']:.2f} ETB ({item['category']})<br/>"
             else:
                 orders_text += "None"
-            p_orders = Paragraph(orders_text, english_style)
+            p_orders = Paragraph(orders_text, amharic_style)
             story.append(p_orders)
 
             story.append(Spacer(1, 0.3 * inch))
@@ -2132,7 +2132,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id,
             document=open(report_filename, 'rb'),
             filename=report_filename,
-            caption="📄 Orders Report PDF Exported Successfully! (Details in English)"
+            caption="📄 Orders Report PDF Exported Successfully! (Updated with latest database data)"
         )
         os.remove(report_filename)  # Clean up
 
