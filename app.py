@@ -1990,18 +1990,42 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        # Fetch users with active or pending subscriptions
+        # Fetch all active/pending subscriptions (to handle multiple per user)
         cur.execute("""
-            SELECT DISTINCT u.id, u.telegram_id, u.full_name, u.phone_number, u.location, u.created_at as user_created
-            FROM public.users u
-            JOIN public.subscriptions s ON u.telegram_id = s.user_id
+            SELECT s.id, s.user_id, s.plan_type, s.meals_remaining, s.selected_dates, s.expiry_date, s.status, s.created_at as sub_created,
+                   u.full_name, u.username, u.phone_number, u.location, u.created_at as user_created
+            FROM public.subscriptions s
+            JOIN public.users u ON s.user_id = u.telegram_id
             WHERE s.status IN ('active', 'pending')
-            ORDER BY u.created_at
+            ORDER BY u.created_at, s.created_at
         """)
-        users = cur.fetchall()
-        if not users:
+        subscriptions_data = cur.fetchall()
+        if not subscriptions_data:
             await update.message.reply_text("❌ ለፒዲኤፍ ወጣ የተመዘገቡ ተጠቃሚዎች ወይም ትዕዛዞች የሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
+
+        # Group by user for better structure, but include all subs
+        user_subs = {}
+        for row in subscriptions_data:
+            sub_id, user_id, plan_type, meals_remaining, selected_dates_json, expiry_date, sub_status, sub_created, full_name, username, phone_number, location, user_created = row
+            if user_id not in user_subs:
+                user_subs[user_id] = {
+                    'full_name': full_name,
+                    'username': username,
+                    'phone_number': phone_number,
+                    'location': location,
+                    'user_created': user_created,
+                    'subscriptions': []
+                }
+            user_subs[user_id]['subscriptions'].append({
+                'sub_id': sub_id,
+                'plan_type': plan_type,
+                'meals_remaining': meals_remaining,
+                'selected_dates': json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json,
+                'expiry_date': expiry_date,
+                'status': sub_status,
+                'sub_created': sub_created
+            })
 
         # Generate PDF report
         report_filename = f"orders_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -2039,87 +2063,90 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         story.append(title)
         story.append(Spacer(1, 0.5 * inch))
 
-        for user_row in users:
-            user_id, telegram_id, full_name, phone_number, location, user_created = user_row
-            # fetch subscription for this user (assume one active/pending)
-            cur.execute("""
-                SELECT s.id, s.plan_type, s.meals_remaining, s.selected_dates, s.expiry_date, s.status, s.created_at as sub_created
-                FROM public.subscriptions s
-                WHERE s.user_id = %s AND s.status IN ('active', 'pending')
-                LIMIT 1
-            """, (telegram_id,))
-            sub = cur.fetchone()
-            if not sub:
-                continue
-            sub_id, plan_type, meals_remaining, selected_dates_json, expiry_date, sub_status, sub_created = sub
-            selected_dates = json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json
-
-            # Fetch payments for this sub
-            cur.execute("""
-                SELECT amount, created_at, status
-                FROM public.payments
-                WHERE subscription_id = %s
-                ORDER BY created_at DESC
-            """, (sub_id,))
-            payments = cur.fetchall()
-            total_paid = sum(amount for amount, _, _ in payments) if payments else 0.0
-
-            # fetch orders for this sub
-            cur.execute("""
-                SELECT meal_date, items, created_at as order_created
-                FROM public.orders
-                WHERE subscription_id = %s AND status = 'confirmed'
-                ORDER BY meal_date
-            """, (sub_id,))
-            orders = cur.fetchall()
-            total_order_price = 0.0
-            all_items = []
-            for meal_date, items_json, order_created in orders:
-                items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                all_items.extend(items)
-                total_order_price += sum(item['price'] for item in items)
-
-            # Translate terms
-            plan_trans = 'Lunch' if plan_type == 'lunch' else 'Dinner'
-            status_trans = 'Pending' if sub_status == 'pending' else 'Active'
+        for user_id, user_info in user_subs.items():
+            full_name = user_info['full_name']
+            username = user_info['username']
+            phone_number = user_info['phone_number']
+            location = user_info['location']
+            user_created = user_info['user_created']
+            subscriptions = user_info['subscriptions']
 
             # User header (English)
-            header_text = f"<b>User:</b> {full_name or 'N/A'} (ID: {telegram_id})<br/><b>Phone:</b> {phone_number or 'N/A'} | <b>Location:</b> {location or 'N/A'} | <b>Joined:</b> {user_created.strftime('%Y-%m-%d')}<br/><b>Subscription:</b> {plan_trans} | <b>Meals Left:</b> {meals_remaining} | <b>Expiry:</b> {expiry_date.strftime('%Y-%m-%d')} | <b>Status:</b> {status_trans} | <b>Subscribed:</b> {sub_created.strftime('%Y-%m-%d')}"
+            header_text = f"<b>User:</b> {full_name or 'N/A'} (ID: {user_id})<br/><b>Phone:</b> {phone_number or 'N/A'} | <b>Location:</b> {location or 'N/A'} | <b>Joined:</b> {user_created.strftime('%Y-%m-%d')}"
             p_header = Paragraph(header_text, english_style)
             story.append(p_header)
             story.append(Spacer(1, 0.2 * inch))
 
-            # Payments (English)
-            payments_text = "<b>Payments:</b><br/>"
-            if payments:
-                for amount, paid_date, status in payments:
-                    status_trans = 'Pending' if status == 'pending' else 'Approved' if status == 'approved' else 'Rejected'
-                    payments_text += f"  - Amount: {amount:.2f} ETB | Date Paid: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status: {status_trans}<br/>"
-                payments_text += f"<br/>  <b>Total Paid:</b> {total_paid:.2f} ETB"
-            else:
-                payments_text += "None"
-            p_payments = Paragraph(payments_text, english_style)
-            story.append(p_payments)
-            story.append(Spacer(1, 0.2 * inch))
+            for sub in subscriptions:
+                sub_id = sub['sub_id']
+                plan_type = sub['plan_type']
+                meals_remaining = sub['meals_remaining']
+                selected_dates = sub['selected_dates']
+                expiry_date = sub['expiry_date']
+                sub_status = sub['status']
+                sub_created = sub['sub_created']
 
-            # Selected Dates (English)
-            dates_text = f"<b>Selected Dates:</b> {', '.join(selected_dates)}"
-            p_dates = Paragraph(dates_text, english_style)
-            story.append(p_dates)
-            story.append(Spacer(1, 0.2 * inch))
+                # Translate terms
+                plan_trans = 'Lunch' if plan_type == 'lunch' else 'Dinner'
+                status_trans = 'Pending' if sub_status == 'pending' else 'Active'
 
-            # Orders (English labels, Amharic food names)
-            orders_text = f"<b>Food Ordered (Total Value: {total_order_price:.2f} ETB):</b><br/>"
-            if orders:
+                # Subscription details
+                sub_text = f"<b>Subscription ID:</b> {sub_id} | <b>Type:</b> {plan_trans} | <b>Meals Left:</b> {meals_remaining} | <b>Expiry:</b> {expiry_date.strftime('%Y-%m-%d')} | <b>Status:</b> {status_trans} | <b>Subscribed:</b> {sub_created.strftime('%Y-%m-%d')}<br/><b>Selected Dates:</b> {', '.join(selected_dates)}"
+                p_sub = Paragraph(sub_text, english_style)
+                story.append(p_sub)
+                story.append(Spacer(1, 0.1 * inch))
+
+                # Fetch payments for this sub
+                cur.execute("""
+                    SELECT amount, created_at, status
+                    FROM public.payments
+                    WHERE subscription_id = %s
+                    ORDER BY created_at DESC
+                """, (sub_id,))
+                payments = cur.fetchall()
+                total_paid = sum(amount for amount, _, _ in payments) if payments else 0.0
+
+                # Payments (English)
+                payments_text = "<b>Payments:</b><br/>"
+                if payments:
+                    for amount, paid_date, status in payments:
+                        status_trans = 'Pending' if status == 'pending' else 'Approved' if status == 'approved' else 'Rejected'
+                        payments_text += f"  - Amount: {amount:.2f} ETB | Date Paid: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status: {status_trans}<br/>"
+                    payments_text += f"<br/>  <b>Total Paid:</b> {total_paid:.2f} ETB"
+                else:
+                    payments_text += "None"
+                p_payments = Paragraph(payments_text, english_style)
+                story.append(p_payments)
+                story.append(Spacer(1, 0.2 * inch))
+
+                # Fetch orders for this sub
+                cur.execute("""
+                    SELECT meal_date, items, created_at as order_created
+                    FROM public.orders
+                    WHERE subscription_id = %s AND status = 'confirmed'
+                    ORDER BY meal_date
+                """, (sub_id,))
+                orders = cur.fetchall()
+                total_order_price = 0.0
+                all_items = []
                 for meal_date, items_json, order_created in orders:
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                    orders_text += f"  - Date Ordered: {meal_date} (Order Date: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
-                    for item in items:
-                        orders_text += f"    * {item['name']} - {item['price']:.2f} ETB ({item['category']})<br/>"
-            else:
-                orders_text += "None"
-            p_orders = Paragraph(orders_text, amharic_style)
-            story.append(p_orders)
+                    all_items.extend(items)
+                    total_order_price += sum(item['price'] for item in items)
+
+                # Orders (English labels, Amharic food names)
+                orders_text = f"<b>Food Ordered (Total Value: {total_order_price:.2f} ETB):</b><br/>"
+                if orders:
+                    for meal_date, items_json, order_created in orders:
+                        items = json.loads(items_json) if isinstance(items_json, str) else items_json
+                        orders_text += f"  - Date Ordered: {meal_date} (Order Date: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
+                        for item in items:
+                            orders_text += f"    * {item['name']} - {item['price']:.2f} ETB ({item['category']})<br/>"
+                else:
+                    orders_text += "None"
+                p_orders = Paragraph(orders_text, amharic_style)
+                story.append(p_orders)
+                story.append(Spacer(1, 0.2 * inch))
 
             story.append(Spacer(1, 0.3 * inch))
             separator = Paragraph("-" * 50, styles['Normal'])
