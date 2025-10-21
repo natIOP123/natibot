@@ -300,7 +300,7 @@ def get_main_keyboard(user_id):
             ['🔐 ክፍያዎችን አረጋግጥ', '🔐 የዕለት ትዕዛዞች'],
             ['🔐 ማስታወቂያ', '🔐 ቦታ አዘጋጅ'],
             ['🔐 ቦታዎችን ተመልከት', '🔐 ቦታዎችን አረጋግጥ'],
-            ['🔐 የሳምንቱን ሪፖርት አትም']
+            ['🔐 ትዕዛዝ ፒዲኤፍ ወጣ']
         ]
     else:
         keyboard = [
@@ -483,7 +483,7 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     location = update.message.text.strip()
     if not location:
         await update.message.reply_text(
-            "❌ ቦታ አልተገለጸም። እባክዎ ቦታዎን በጽሑፍ ያስገቡ።\n\n"
+            "❌ ቦታ አልተስገበም። እባክዎ ቦታዎን በጽሑፍ ያስገቡ።\n\n"
             "🔄 እባክዎ እንደገና ይሞክሩ!",
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
@@ -505,7 +505,7 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 keyboard = [
                     [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{pending_id}"),
-                     InlineKeyboardButton("ውድቅ ተደርጓል", callback_data=f"reject_location_{pending_id}")]
+                     InlineKeyboardButton("ውድቅ", callback_data=f"reject_location_{pending_id}")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await context.bot.send_message(
@@ -525,7 +525,7 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return WAIT_LOCATION_APPROVAL
     except Exception as e:
         logger.error(f"Error saving location for user {user.id}: {e}")
-        await update.message.reply_text("❌ ቦታ በመመዝገብ ላይ ስህተት ተፈጥሯል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+        await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return USER_CHANGE_LOCATION
     finally:
         if cur:
@@ -585,7 +585,7 @@ async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"{', '.join(meal_details) if meal_details else 'አልተመረጡም'}\n\n"
             f"💰 ጠቅላላ ዋጋ: {total_price:.2f} ብር\n\n"
             f"🍽 ቀሪ ምግቦች: {meals_remaining}\n\n"
-           
+            "🔧 ለመምረጥ /select_meals ይጠቀሙ!"
         )
         await update.message.reply_text(text, reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
@@ -740,7 +740,7 @@ async def process_reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE)
             keyboard.append([button_text])
         keyboard.append(['🔙 ተመለስ'])
         await update.message.reply_text(
-            "📅 አዲሱን ቀን ይምረጡ (ከዛሬ ጀምሮ እስከ የትዕዛዝዎ ቀን ድረስ) ✅):\n\n"
+            "📅 አዲሱን ቀን ይምረጡ (ከዛሬ ቀጣይ ቀናት እስከ ጫናዎ ውስጥ):\n\n"
             "🚀 ቀን ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
         )
@@ -788,7 +788,7 @@ async def reschedule_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     expiry_date = selected_order['expiry'].date()
     if new_date > expiry_date:
         await update.message.reply_text(
-            f"❌ አዲሱ ቀን የምዝገባዎ ጊዜ ገደብ ({expiry_date}) ውስጥ መሆን አለበት። ✅\n\n"
+            f"❌ አዲሱ ቀን የምዝገባዎ ጫና ({expiry_date}) ውስጥ መሆን አለበት።\n\n"
             "🔄 ትክክለኛ ቀን ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
@@ -912,7 +912,7 @@ async def save_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return REGISTER_PHONE
     except Exception as e:
         logger.error(f"Error saving name for user {user.id}: {e}")
-        await update.message.reply_text("❌ ስም በመመዝገብ ላይ ስህተት ተፈጥሯል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+        await update.message.reply_text("❌ ስም በማስቀመጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return REGISTER_NAME
     finally:
         if cur:
@@ -980,7 +980,7 @@ async def register_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return REGISTER_LOCATION
     except Exception as e:
         logger.error(f"Error saving phone for user {user.id}: {e}")
-        await update.message.reply_text("❌ ስስልክ ቁጥር በመመዝገብ ላይ ስህተት ተፈጥሯል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+        await update.message.reply_text("❌ ስልክ ቁጥር በማስቀመጥ ላይ ስህተት ተከስቷል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return REGISTER_PHONE
     finally:
         if cur:
@@ -996,7 +996,7 @@ async def register_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     location = update.message.text.strip()
     if not location:
         await update.message.reply_text(
-            "❌ ቦታ አልተመዘገበም።\n\n"
+            "❌ ቦታ አልተስገበም።\n\n"
             "📝 እባክዎ ቦታዎን በጽሑፍ ያስገቡ።\n\n"
             "🔄 እንደገና ይሞክሩ!",
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
@@ -1059,7 +1059,7 @@ async def confirm_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     keyboard = [
                         [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{pending_id}"),
-                         InlineKeyboardButton("ውድቅ ተደርጓል", callback_data=f"reject_location_{pending_id}")]
+                         InlineKeyboardButton("ውድቅ", callback_data=f"reject_location_{pending_id}")]
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     await context.bot.send_message(
@@ -1079,7 +1079,7 @@ async def confirm_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return WAIT_LOCATION_APPROVAL
         except Exception as e:
             logger.error(f"Error saving location for user {user.id}: {e}")
-            await update.message.reply_text("❌ ቦታ በመመዝገብ ላይ ስህተት ተፈጥሯል።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+            await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
             return CONFIRM_LOCATION
         finally:
             if cur:
@@ -1228,7 +1228,7 @@ async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await back_to_main(update, context)
     if choice not in plans:
         await update.message.reply_text(
-            "❌ የተሳሳተ ምርጫ።\n\n"
+            "❌ የማይሰርአ ምርጫ።\n\n"
             "📦 እባክዎ '🍽️ የምሳ' ወይም '🥘 የእራት' ይምረጡ።\n\n"
             "🔄 ትክክለኛ ምርጫ ይምረጡ!",
             reply_markup=ReplyKeyboardMarkup(
@@ -1284,9 +1284,9 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = [days_to_show[i:i+3] for i in range(0, len(days_to_show), 3)]
             keyboard.append(['ጨርስ', '🔙 ተመለስ'])
             await update.message.reply_text(
-                "❌ እባክዎ አንድ ቀን ይምረጡ።\n\n"
-                "📅 እባክዎ አንድ ቀን ይምረጡ!\n\n"
-                "🔄 ቀናት መምረጥ ያስፈልጋል!",
+                "❌ ቢያንስ አንድ ቀን ይምረጠው።\n\n"
+                "📅 ቢያንስ አንድ ቀን ይምረጠው!\n\n"
+                "🔄 ቀናት ይምረጠው!",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
             return CHOOSE_DATE
@@ -1381,7 +1381,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = [days_to_show[i:i+3] for i in range(0, len(days_to_show), 3)]
             keyboard.append(['ጨርስ', '🔙 ተመለስ'])
             await update.message.reply_text(
-                f"❌ {choice} አስቀድሞ ተመርጧል።\n\n"
+                f"❌ {choice} ቀደም ብሎ ታክሏል።\n\n"
                 "📅 እባክዎ ሌላ ቀን ይምረጠው ወይም 'ጨርስ' ይጫኑ።\n\n"
                 "🔄 ቀናት ይምረጠው!",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -1393,8 +1393,8 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [days_to_show[i:i+3] for i in range(0, len(days_to_show), 3)]
         keyboard.append(['ጨርስ', '🔙 ተመለስ'])
         await update.message.reply_text(
-            f"✅ {choice} ተመርጧል።\n\n"
-            "📅 እባክዎ ተጨማሪ ቀናት ይምረጡ። ወይም 'ጨርስ' ይጫኑ።\n\n"
+            f"✅ {choice} ተታክሏል።\n\n"
+            "📅 ተጨማሪ ቀና቉ ይምረጠው ወይም 'ጨርስ' ይጫኑ።\n\n"
             "🚀 ቀናት ይምረጠው!",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
@@ -1406,7 +1406,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ የማይሰራ ምርጫ።\n\n"
             "📅 እባክዎ ቀን ወይም 'ጨርስ' ይምረጠው።\n\n"
-            "🔄 ትክክለኛ ምርጫ ይምረጡ!",
+            "🔄 ትክክለኛ ምርጫ ይምረጠው!",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return CHOOSE_DATE
@@ -1439,7 +1439,7 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ]
         if not valid_items:
             await update.message.reply_text(
-                "❌ ለዚህ ሳምንት ምንም ምግቦች አልተመዘገቡም።\n\n"
+                "❌ በዚህ ሳምንት የታቀዘ ምግቦች የሉም።\n\n"
                 "🔄 እባክዎ እንደገና ይሞክሩ!",
                 reply_markup=get_main_keyboard(update.effective_user.id)
             )
@@ -1546,7 +1546,7 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for idx, item in enumerate(non_fasting_items, 1):
             menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
         menu_text += (
-            f"📝 ለ{first_day} የምግብ ቁጥር ያስገቡ። (ለምሳሌ፣ '1')።\n\n"
+            f"📝 ለ{first_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n\n"
             "🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
         )
         await update.message.reply_text(
@@ -1612,7 +1612,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
     if text == 'ጨርስ':
         if len(selected_meals.get(current_day, [])) == 0:
             menu_shown = context.user_data.get('menu_shown', False)
-            prompt = f"❌ ለ{current_day} እባክዎ ቢያንስ አንድ ምግብ ይምረጡ።\n\n"
+            prompt = f"❌ ለ{current_day} ቢያንስ አንድ ምግብ ይምረጠው።\n\n"
             if menu_shown:
                 prompt += f"🔢 ለ{current_day} ቁጥል ያስገቡ (1-{len(menu_items)}):\n\n"
             else:
@@ -1990,42 +1990,18 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        # Fetch all active/pending subscriptions (to handle multiple per user)
+        # Fetch users with active or pending subscriptions
         cur.execute("""
-            SELECT s.id, s.user_id, s.plan_type, s.meals_remaining, s.selected_dates, s.expiry_date, s.status, s.created_at as sub_created,
-                   u.full_name, u.username, u.phone_number, u.location, u.created_at as user_created
-            FROM public.subscriptions s
-            JOIN public.users u ON s.user_id = u.telegram_id
+            SELECT DISTINCT u.id, u.telegram_id, u.full_name, u.phone_number, u.location, u.created_at as user_created
+            FROM public.users u
+            JOIN public.subscriptions s ON u.telegram_id = s.user_id
             WHERE s.status IN ('active', 'pending')
-            ORDER BY u.created_at, s.created_at
+            ORDER BY u.created_at
         """)
-        subscriptions_data = cur.fetchall()
-        if not subscriptions_data:
+        users = cur.fetchall()
+        if not users:
             await update.message.reply_text("❌ ለፒዲኤፍ ወጣ የተመዘገቡ ተጠቃሚዎች ወይም ትዕዛዞች የሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
-
-        # Group by user for better structure, but include all subs
-        user_subs = {}
-        for row in subscriptions_data:
-            sub_id, user_id, plan_type, meals_remaining, selected_dates_json, expiry_date, sub_status, sub_created, full_name, username, phone_number, location, user_created = row
-            if user_id not in user_subs:
-                user_subs[user_id] = {
-                    'full_name': full_name,
-                    'username': username,
-                    'phone_number': phone_number,
-                    'location': location,
-                    'user_created': user_created,
-                    'subscriptions': []
-                }
-            user_subs[user_id]['subscriptions'].append({
-                'sub_id': sub_id,
-                'plan_type': plan_type,
-                'meals_remaining': meals_remaining,
-                'selected_dates': json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json,
-                'expiry_date': expiry_date,
-                'status': sub_status,
-                'sub_created': sub_created
-            })
 
         # Generate PDF report
         report_filename = f"orders_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -2063,90 +2039,87 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         story.append(title)
         story.append(Spacer(1, 0.5 * inch))
 
-        for user_id, user_info in user_subs.items():
-            full_name = user_info['full_name']
-            username = user_info['username']
-            phone_number = user_info['phone_number']
-            location = user_info['location']
-            user_created = user_info['user_created']
-            subscriptions = user_info['subscriptions']
+        for user_row in users:
+            user_id, telegram_id, full_name, phone_number, location, user_created = user_row
+            # fetch subscription for this user (assume one active/pending)
+            cur.execute("""
+                SELECT s.id, s.plan_type, s.meals_remaining, s.selected_dates, s.expiry_date, s.status, s.created_at as sub_created
+                FROM public.subscriptions s
+                WHERE s.user_id = %s AND s.status IN ('active', 'pending')
+                LIMIT 1
+            """, (telegram_id,))
+            sub = cur.fetchone()
+            if not sub:
+                continue
+            sub_id, plan_type, meals_remaining, selected_dates_json, expiry_date, sub_status, sub_created = sub
+            selected_dates = json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json
+
+            # Fetch payments for this sub
+            cur.execute("""
+                SELECT amount, created_at, status
+                FROM public.payments
+                WHERE subscription_id = %s
+                ORDER BY created_at DESC
+            """, (sub_id,))
+            payments = cur.fetchall()
+            total_paid = sum(amount for amount, _, _ in payments) if payments else 0.0
+
+            # fetch orders for this sub
+            cur.execute("""
+                SELECT meal_date, items, created_at as order_created
+                FROM public.orders
+                WHERE subscription_id = %s AND status = 'confirmed'
+                ORDER BY meal_date
+            """, (sub_id,))
+            orders = cur.fetchall()
+            total_order_price = 0.0
+            all_items = []
+            for meal_date, items_json, order_created in orders:
+                items = json.loads(items_json) if isinstance(items_json, str) else items_json
+                all_items.extend(items)
+                total_order_price += sum(item['price'] for item in items)
+
+            # Translate terms
+            plan_trans = 'Lunch' if plan_type == 'lunch' else 'Dinner'
+            status_trans = 'Pending' if sub_status == 'pending' else 'Active'
 
             # User header (English)
-            header_text = f"<b>User:</b> {full_name or 'N/A'} (ID: {user_id})<br/><b>Phone:</b> {phone_number or 'N/A'} | <b>Location:</b> {location or 'N/A'} | <b>Joined:</b> {user_created.strftime('%Y-%m-%d')}"
+            header_text = f"<b>User:</b> {full_name or 'N/A'} (ID: {telegram_id})<br/><b>Phone:</b> {phone_number or 'N/A'} | <b>Location:</b> {location or 'N/A'} | <b>Joined:</b> {user_created.strftime('%Y-%m-%d')}<br/><b>Subscription:</b> {plan_trans} | <b>Meals Left:</b> {meals_remaining} | <b>Expiry:</b> {expiry_date.strftime('%Y-%m-%d')} | <b>Status:</b> {status_trans} | <b>Subscribed:</b> {sub_created.strftime('%Y-%m-%d')}"
             p_header = Paragraph(header_text, english_style)
             story.append(p_header)
             story.append(Spacer(1, 0.2 * inch))
 
-            for sub in subscriptions:
-                sub_id = sub['sub_id']
-                plan_type = sub['plan_type']
-                meals_remaining = sub['meals_remaining']
-                selected_dates = sub['selected_dates']
-                expiry_date = sub['expiry_date']
-                sub_status = sub['status']
-                sub_created = sub['sub_created']
+            # Payments (English)
+            payments_text = "<b>Payments:</b><br/>"
+            if payments:
+                for amount, paid_date, status in payments:
+                    status_trans = 'Pending' if status == 'pending' else 'Approved' if status == 'approved' else 'Rejected'
+                    payments_text += f"  - Amount: {amount:.2f} ETB | Date Paid: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status: {status_trans}<br/>"
+                payments_text += f"<br/>  <b>Total Paid:</b> {total_paid:.2f} ETB"
+            else:
+                payments_text += "None"
+            p_payments = Paragraph(payments_text, english_style)
+            story.append(p_payments)
+            story.append(Spacer(1, 0.2 * inch))
 
-                # Translate terms
-                plan_trans = 'Lunch' if plan_type == 'lunch' else 'Dinner'
-                status_trans = 'Pending' if sub_status == 'pending' else 'Active'
+            # Selected Dates (English)
+            dates_text = f"<b>Selected Dates:</b> {', '.join(selected_dates)}"
+            p_dates = Paragraph(dates_text, english_style)
+            story.append(p_dates)
+            story.append(Spacer(1, 0.2 * inch))
 
-                # Subscription details
-                sub_text = f"<b>Subscription ID:</b> {sub_id} | <b>Type:</b> {plan_trans} | <b>Meals Left:</b> {meals_remaining} | <b>Expiry:</b> {expiry_date.strftime('%Y-%m-%d')} | <b>Status:</b> {status_trans} | <b>Subscribed:</b> {sub_created.strftime('%Y-%m-%d')}<br/><b>Selected Dates:</b> {', '.join(selected_dates)}"
-                p_sub = Paragraph(sub_text, english_style)
-                story.append(p_sub)
-                story.append(Spacer(1, 0.1 * inch))
-
-                # Fetch payments for this sub
-                cur.execute("""
-                    SELECT amount, created_at, status
-                    FROM public.payments
-                    WHERE subscription_id = %s
-                    ORDER BY created_at DESC
-                """, (sub_id,))
-                payments = cur.fetchall()
-                total_paid = sum(amount for amount, _, _ in payments) if payments else 0.0
-
-                # Payments (English)
-                payments_text = "<b>Payments:</b><br/>"
-                if payments:
-                    for amount, paid_date, status in payments:
-                        status_trans = 'Pending' if status == 'pending' else 'Approved' if status == 'approved' else 'Rejected'
-                        payments_text += f"  - Amount: {amount:.2f} ETB | Date Paid: {paid_date.strftime('%Y-%m-%d %H:%M')} | Status: {status_trans}<br/>"
-                    payments_text += f"<br/>  <b>Total Paid:</b> {total_paid:.2f} ETB"
-                else:
-                    payments_text += "None"
-                p_payments = Paragraph(payments_text, english_style)
-                story.append(p_payments)
-                story.append(Spacer(1, 0.2 * inch))
-
-                # Fetch orders for this sub
-                cur.execute("""
-                    SELECT meal_date, items, created_at as order_created
-                    FROM public.orders
-                    WHERE subscription_id = %s AND status = 'confirmed'
-                    ORDER BY meal_date
-                """, (sub_id,))
-                orders = cur.fetchall()
-                total_order_price = 0.0
-                all_items = []
+            # Orders (English labels, Amharic food names)
+            orders_text = f"<b>Food Ordered (Total Value: {total_order_price:.2f} ETB):</b><br/>"
+            if orders:
                 for meal_date, items_json, order_created in orders:
                     items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                    all_items.extend(items)
-                    total_order_price += sum(item['price'] for item in items)
-
-                # Orders (English labels, Amharic food names)
-                orders_text = f"<b>Food Ordered (Total Value: {total_order_price:.2f} ETB):</b><br/>"
-                if orders:
-                    for meal_date, items_json, order_created in orders:
-                        items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                        orders_text += f"  - Date Ordered: {meal_date} (Order Date: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
-                        for item in items:
-                            orders_text += f"    * {item['name']} - {item['price']:.2f} ETB ({item['category']})<br/>"
-                else:
-                    orders_text += "None"
-                p_orders = Paragraph(orders_text, amharic_style)
-                story.append(p_orders)
-                story.append(Spacer(1, 0.2 * inch))
+                    orders_text += f"  - Date Ordered: {meal_date} (Order Date: {order_created.strftime('%Y-%m-%d %H:%M')})<br/>"
+                    for item in items:
+                        orders_text += f"    * {item['name']} - {item['price']:.2f} ETB ({item['category']})<br/>"
+            else:
+                orders_text += "None"
+            p_orders = Paragraph(orders_text, amharic_style)
+            story.append(p_orders)
 
             story.append(Spacer(1, 0.3 * inch))
             separator = Paragraph("-" * 50, styles['Normal'])
