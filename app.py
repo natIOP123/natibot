@@ -300,7 +300,7 @@ def get_main_keyboard(user_id):
             ['🔐 ክፍያዎችን አረጋግጥ', '🔐 የዕለት ትዕዛዞች'],
             ['🔐 ማስታወቂያ', '🔐 ቦታ አዘጋጅ'],
             ['🔐 ቦታዎችን ተመልከት', '🔐 ቦታዎችን አረጋግጥ'],
-            ['🔐 ትዕዛዝ ፒዲኤፍ ወጣ']
+            ['🔐 የሳምንቱን ሪፖርት አትም']
         ]
     else:
         keyboard = [
@@ -505,7 +505,7 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 keyboard = [
                     [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{pending_id}"),
-                     InlineKeyboardButton("ውድቅ", callback_data=f"reject_location_{pending_id}")]
+                     InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_location_{pending_id}")]
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 await context.bot.send_message(
@@ -1059,7 +1059,7 @@ async def confirm_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     keyboard = [
                         [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{pending_id}"),
-                         InlineKeyboardButton("ውድቅ", callback_data=f"reject_location_{pending_id}")]
+                         InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_location_{pending_id}")]
                     ]
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     await context.bot.send_message(
@@ -1926,7 +1926,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
-                             InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
+                             InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_payment_{payment_id}")]
                         ])
                     )
                 except Exception as e:
@@ -1939,7 +1939,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
-                             InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
+                             InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_payment_{payment_id}")]
                         ])
                     )
             except Exception as e:
@@ -2207,7 +2207,7 @@ async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_
         for location_id, full_name, username, location_text in locations:
             keyboard = [
                 [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{location_id}"),
-                 InlineKeyboardButton("ውድቅ", callback_data=f"reject_location_{location_id}")]
+                 InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_location_{location_id}")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.send_message(
@@ -2329,7 +2329,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
         for payment_id, full_name, username, amount, receipt_url, user_id, subscription_id in payments:
             keyboard = [
                 [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
-                 InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
+                 InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_payment_{payment_id}")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             try:
@@ -3171,7 +3171,7 @@ def main():
                     MessageHandler(filters.Regex('^🔐 ቦታ አዘጋጅ$'), set_admin_location),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን ተመልከት$'), view_locations),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን አረጋግጥ$'), admin_approve_locations),
-                    MessageHandler(filters.Regex('^🔐 ትዕዛዝ ፒዲኤፍ ወጣ$'), admin_export_pdf),
+                    MessageHandler(filters.Regex('^🔐 የሳምንቱን ሪፖርት አትም$'), admin_export_pdf),
                     MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^⏳ ማረጋገጫ በመጠበቅ ላይ$'), lambda u, c: MAIN_MENU),  # Restricted
