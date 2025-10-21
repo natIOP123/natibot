@@ -2289,8 +2289,8 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
             await context.bot.send_message(
                 chat_id=user_id,
                 text="❌ ቦታዎ ተሰርዟል።\n\n"
-                     "🔄 እባክዎ ምዝገባዎን ከመጀመር ጋር እንደገና ይጀምሩ እና ቦታዎን እና ክፍያ ዝርዝሮችዎን እንደገና ይስጡ።\n\n"
-                     "🚀 /start ይጠቀሙ እና ምዝገባዎን ከመጀመር ይጀምሩ!",
+                     "🔄 እባክዎ ከመጀመር ጋር እንደገና ይጀምሩ።\n\n"
+                     "🚀 /start ይጠቀሙ!",
                 reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
             )
     except Exception as e:
@@ -2534,7 +2534,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 detailed_text += "   (ምግቦች አልተገኙም)\n"
 
             detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
-            detailed_text += "🛒 እባክዎ ምዝገባዎን ከመጀመር ጋር እንደገና ይጀምሩ እና ቦታዎን፣ ምግቦችዎን እና ክፍያ ዝርዝሮችዎን እንደገና ይስጡ።\n"
+            detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n"
             detailed_text += "🔄 እንደገና ይጀምሩ!"
 
             # Send to USER
