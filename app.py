@@ -3247,4 +3247,5 @@ def main():
         logger.error(f"Error starting bot: {e}")
 
 if __name__ == '__main__':
+    
     main()
