@@ -1285,7 +1285,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append(['ጨርስ', '🔙 ተመለስ'])
             await update.message.reply_text(
                 "❌ እባክዎ አንድ ቀን ይምረጡ።\n\n"
-                "📅 እባክዎ አንድ ቀን ይምረጠው!\n\n"
+                "📅 እባክዎ አንድ ቀን ይምረጡ!\n\n"
                 "🔄 ቀናት መምረጥ ያስፈልጋል!",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
@@ -1614,7 +1614,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             menu_shown = context.user_data.get('menu_shown', False)
             prompt = f"❌ ለ{current_day} እባክዎ ቢያንስ አንድ ምግብ ይምረጡ።\n\n"
             if menu_shown:
-                prompt += f"🔢 ለ{current_day} ቁጥር ያስገቡ (1-{len(menu_items)}):\n\n"
+                prompt += f"🔢 ለ{current_day} ቁጥል ያስገቡ (1-{len(menu_items)}):\n\n"
             else:
                 fasting_items = [item for item in menu_items if item['category'] == 'fasting']
                 non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
@@ -1624,7 +1624,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
                 prompt += "🍖 የፍስክ ምግብ ዝርዝር:\n\n"
                 for idx, item in enumerate(non_fasting_items, 1):
                     prompt += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
-                prompt += f"📝 ለ{current_day} የምግብ ቁጥር ያስገቡ (ለምሳሌ፣ '1')።\n\n"
+                prompt += f"📝 ለ{current_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n\n"
             await update.message.reply_text(
                 prompt,
                 reply_markup=ReplyKeyboardMarkup([['ጨርስ'], ['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
@@ -1638,14 +1638,14 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
         menu_shown = context.user_data.get('menu_shown', False)
         if menu_shown:
             next_prompt = (
-                f"📅 ለ{next_day} ምግብ ቁጥር ያስገቡ (1-{len(menu_items)}):\n\n"
+                f"📅 ለ{next_day} ምግብ ቁጥል ያስገቡ (1-{len(menu_items)}):\n\n"
                 f"🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
             )
         else:
             fasting_items = [item for item in menu_items if item['category'] == 'fasting']
             non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
             next_prompt = (
-                f"📜 እባክዎ ለ{next_day} ምግብ ይምረጡ።\n\n"
+                f"📜 ለ{next_day} ምግብ ይምረጠው:\n\n"
                 "🍲 የጾም ምግብ ዝርዝር:\n\n"
             )
             for idx, item in enumerate(fasting_items, 1):
@@ -1654,7 +1654,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             for idx, item in enumerate(non_fasting_items, 1):
                 next_prompt += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
             next_prompt += (
-                f"📝 ለ{next_day} የምግብ ቁጥር ያስገቡ (ለምሳሌ፣ '1')።\n\n"
+                f"📝 ለ{next_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n\n"
                 "🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
             )
             context.user_data['menu_shown'] = True
@@ -1686,14 +1686,14 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             menu_shown = context.user_data.get('menu_shown', False)
             if menu_shown:
                 next_prompt = (
-                    f"📅 ለ{next_day} ምግብ ቁጥር ያስገቡ (1-{len(menu_items)}):\n\n"
+                    f"📅 ለ{next_day} ምግብ ቁጥል ያስገቡ (1-{len(menu_items)}):\n\n"
                     f"🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
                 )
             else:
                 fasting_items = [item for item in menu_items if item['category'] == 'fasting']
                 non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
                 next_prompt = (
-                    f"📜 እባክዎ ለ{next_day} ምግብ ይምረጡ:\n\n"
+                    f"📜 ለ{next_day} ምግብ ይምረጠው:\n\n"
                     "🍲 የጾም ምግብ ዝርዝር:\n\n"
                 )
                 for idx, item in enumerate(fasting_items, 1):
@@ -1702,7 +1702,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
                 for idx, item in enumerate(non_fasting_items, 1):
                     next_prompt += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
                 next_prompt += (
-                    f"📝 ለ{next_day} የምግብ ቁጥር ያስገቡ (ለምሳሌ፣ '1')።\n\n"
+                    f"📝 ለ{next_day} የምግብ ቁጥል ያስገቡ (ለምሳሌ፣ '1')።\n\n"
                     "🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
                 )
                 context.user_data['menu_shown'] = True
@@ -1713,7 +1713,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             return MEAL_SELECTION
         else:
             menu_shown = context.user_data.get('menu_shown', False)
-            error_prompt = f"❌ የማይሰራ የምግብ ቁጥር {text}።\n\n"
+            error_prompt = f"❌ የማይሰራ የምግብ ቁጥል {text}።\n\n"
             if menu_shown:
                 error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጠውፍፍ።\n\n"
             else:
@@ -1727,7 +1727,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
                     error_prompt += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
                 error_prompt += f"🔢 1 እስከ {len(menu_items)} መካከል ይምረጠው።\n\n"
                 context.user_data['menu_shown'] = True
-            error_prompt += "🔄 ትክክለኛ ቁጥር ያስገቡ!"
+            error_prompt += "🔄 ትክክለኛ ቁጥል ያስገቡ!"
             await update.message.reply_text(
                 error_prompt,
                 reply_markup=ReplyKeyboardMarkup([['ጨርስ'], ['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
@@ -1735,9 +1735,9 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             return MEAL_SELECTION
     except ValueError:
         menu_shown = context.user_data.get('menu_shown', False)
-        error_prompt = f"❌ የማይሰራ ጊዜ '{text}'።\n\n"
+        error_prompt = f"❌ የማይሰራ ጊዛ '{text}'።\n\n"
         if menu_shown:
-            error_prompt += f"🔢 ቁጥር ያስገቡ (ለምሳሌ '1' 1-{len(menu_items)} መካከል):\n\n"
+            error_prompt += f"🔢 ንጥል ያስገቡ (ለምሳሌ '1' 1-{len(menu_items)} መካከል):\n\n"
         else:
             fasting_items = [item for item in menu_items if item['category'] == 'fasting']
             non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
@@ -1747,7 +1747,7 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
             error_prompt += "🍖 የፍስክ ምግብ ዝርዝር:\n\n"
             for idx, item in enumerate(non_fasting_items, 1):
                 error_prompt += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
-            error_prompt += f"🔢 ቁጥር ያስገቡ (ለምሳሌ '1' 1-{len(menu_items)} መካከል):\n\n"
+            error_prompt += f"🔢 ንጥል ያስገቡ (ለምሳሌ '1' 1-{len(menu_items)} መካከል):\n\n"
             context.user_data['menu_shown'] = True
         error_prompt += "🔄 ትክክለኛ ንጥል ያስገቡ!"
         await update.message.reply_text(
@@ -1810,7 +1810,7 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         fasting_items = [item for item in menu_items if item['category'] == 'fasting']
         non_fasting_items = [item for item in menu_items if item['category'] == 'non_fasting']
         menu_text = (
-            f"📜 እባክዎ ለመረጡት ቀናት ምግቦች እንደገና ይምረጡ።\n\n"
+            f"📜 ለመረጡት ቀናት ምግቦች እንደገና ይምረጠው:\n\n"
             f"📅 የተመረጠው ቀናት: {', '.join(selected_dates)}\n\n"
         )
         if not menu_shown:
@@ -1822,7 +1822,7 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 menu_text += f"{idx + len(fasting_items)}. {item['name']} - {item['price']:.2f} ብር\n\n"
             context.user_data['menu_shown'] = True
         menu_text += (
-            f"📝 ለ{selected_dates[0]} የምግብ ቁጥር ያስገቡ (ለምሳሌ '1')።\n\n"
+            f"📝 ለ{selected_dates[0]} የምግብ ቁጥል ያስገቡ (ለምሳሌ '1')።\n\n"
             "🚫 ለመሰረዝ 'ሰርዝ' ይፃፉ።"
         )
         await update.message.reply_text(
@@ -1868,7 +1868,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return MAIN_MENU
     if not update.message.photo:
         await update.message.reply_text(
-            "❌ የክፍያ ማረጋገጫ ምስል ያስገቡ።\n\n"
+            "❌ የክፍላ ማረጋገጫ ምስል ያስገቡ።\n\n"
             "📤 ምስል ያስገቡ!\n\n"
             "🔄 እባክዎ ምስል ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
@@ -1886,7 +1886,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not subscription_id or total_price <= 0:
             logger.error(f"Missing or invalid subscription_id or total_price for user {user.id}")
             await update.message.reply_text(
-                "❌ ስህተት: የመመዝገቢያዎ ወይም የክፍያ መረጃዎ አልተገኘም።\n\n"
+                "❌ ስህተት: የመመዝገቢያዎ ወይም የክፍፍ መረጃዎ አይገኝም።\n\n"
                 "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n\n"
                 "🔄 እንደገና ይጀምሩ!",
                 reply_markup=get_main_keyboard(user.id)
@@ -1921,7 +1921,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_photo(
                         chat_id=admin_id,
                         photo=receipt_url,
-                        caption=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ {total_price:.2f} ብር።\n\n"
+                        caption=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
                                 f"💳 እባክዎ ይፈትሹ።\n\n"
                                 "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
@@ -1939,7 +1939,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
-                             InlineKeyboardButton("ውድቅ ተደርጓል", callback_data=f"reject_payment_{payment_id}")]
+                             InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
                         ])
                     )
             except Exception as e:
@@ -1958,7 +1958,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"Error notifying admin {admin_id} about new order: {e}")
         await update.message.reply_text(
-            "📤 ክፍያዎ ተልኳል✅።\n\n"
+            "📤 ክፋዎ ተልኳል።\n\n"
             "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
             "🚀 በትክክል ይጠብቁ!",
             reply_markup=get_main_keyboard(user.id)
@@ -2001,7 +2001,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """)
         subscriptions_data = cur.fetchall()
         if not subscriptions_data:
-            await update.message.reply_text("❌ ለፒዲኤፍ የተመዘገቡ ተጠቃሚዎች ወይም ትዕዛዞች አልተገኙም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+            await update.message.reply_text("❌ ለፒዲኤፍ ወጣ የተመዘገቡ ተጠቃሚዎች ወይም ትዕዛዞች የሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
             return MAIN_MENU
 
         # Group by user for better structure, but include all subs
@@ -2034,7 +2034,6 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Register Amharic font for food names (download if not present)
         font_path = 'NotoSansEthiopic-Regular.ttf'
-        bold_font_path = 'NotoSansEthiopic-Bold.ttf'
         try:
             if not os.path.exists(font_path):
                 logger.info("Downloading Amharic font...")
@@ -2044,16 +2043,8 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 with open(font_path, 'wb') as f:
                     f.write(response.content)
                 logger.info("Font downloaded successfully.")
-            if not os.path.exists(bold_font_path):
-                logger.info("Downloading Amharic bold font...")
-                bold_url = "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansEthiopic/NotoSansEthiopic-Bold.ttf"
-                response = requests.get(bold_url)
-                response.raise_for_status()
-                with open(bold_font_path, 'wb') as f:
-                    f.write(response.content)
-                logger.info("Bold font downloaded successfully.")
             pdfmetrics.registerFont(TTFont('Amharic', font_path))
-            pdfmetrics.registerFont(TTFont('Amharic-Bold', bold_font_path))
+            pdfmetrics.registerFont(TTFont('Amharic-Bold', font_path.replace('Regular', 'Bold')))
             amharic_style = ParagraphStyle(
                 'AmharicStyle',
                 parent=styles['Normal'],
@@ -2208,7 +2199,7 @@ async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_
         locations = cur.fetchall()
         if not locations:
             await update.message.reply_text(
-                "📭 ለቦታ ማስያዣ ምንም የሚገኙ ቦታዎች የሉም።\n\n"
+                "📭 ለፍተሻ ተጠባቂ ቦታዎች የሉም።\n\n"
                 "🔙 ወደ መነሻ ገጽ!",
                 reply_markup=get_main_keyboard(user.id)
             )
@@ -2216,7 +2207,7 @@ async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_
         for location_id, full_name, username, location_text in locations:
             keyboard = [
                 [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{location_id}"),
-                 InlineKeyboardButton("ውድቅ ተደርጓል", callback_data=f"reject_location_{location_id}")]
+                 InlineKeyboardButton("ውድቅ", callback_data=f"reject_location_{location_id}")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             await context.bot.send_message(
@@ -2278,7 +2269,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
             # Send direct to subscription plan
             await context.bot.send_message(
                 chat_id=user_id,
-                text="✅ ቦታዎ ተቀባይነት አግኝቷል!\n\n"
+                text="✅ ቦታዎ ተቀበለ!\n\n"
                      "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
                      "🍽️ የምሳ\n\n"
                      "🥘 የእራት\n\n"
@@ -2330,7 +2321,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
         payments = cur.fetchall()
         if not payments:
             await update.message.reply_text(
-                "📭 ለቦታ ማስያዣ ምንም በመጠባበቅ ላይ ያሉ ክፍያዎች የሉም።\n\n"
+                "📭 ለፍተሻ ተጠባቂ ክፍያዎች የሉም።\n\n"
                 "🔙 ወደ መነሻ ገጽ!",
                 reply_markup=get_main_keyboard(user.id)
             )
@@ -2338,7 +2329,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
         for payment_id, full_name, username, amount, receipt_url, user_id, subscription_id in payments:
             keyboard = [
                 [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
-                 InlineKeyboardButton("ውድቅ ተደርጓል", callback_data=f"reject_payment_{payment_id}")]
+                 InlineKeyboardButton("ውድቅ", callback_data=f"reject_payment_{payment_id}")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
             try:
@@ -2404,6 +2395,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
             conn.close()
 
 # Handle payment approval/rejection callback
+# Handle payment approval/rejection callback
 async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -2450,7 +2442,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
 
             # Notify admin (edit original message safely)
             try:
-                await query.edit_message_text("✅ ክፍያ ተቀበለ።\n🚀 ተ���በለ!")
+                await query.edit_message_text("✅ ክፍያ ተቀበለ።\n🚀 ተቀበለ!")
             except Exception as e:
                 logger.warning(f"Could not edit admin message: {e}")
                 try:
@@ -2539,7 +2531,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                         logger.error(f"Failed to parse items for rejected order on {meal_date}: {parse_err}")
                         detailed_text += f"📅 {meal_date}: (ስህተት በምግብ ዝርዝር)\n"
             else:
-                detailed_text += "   (ምግቦች አልተ���ኙም)\n"
+                detailed_text += "   (ምግቦች አልተገኙም)\n"
 
             detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
             detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n"
