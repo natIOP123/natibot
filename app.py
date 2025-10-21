@@ -1285,7 +1285,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard.append(['ጨርስ', '🔙 ተመለስ'])
             await update.message.reply_text(
                 "❌ እባክዎ አንድ ቀን ይምረጡ።\n\n"
-                "📅 እባክዎ አንድ ቀን ይምረጡ!\n\n"
+                "📅 እባክዎ አንድ ቀን ይምረጠው!\n\n"
                 "🔄 ቀናት መምረጥ ያስፈልጋል!",
                 reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             )
@@ -2034,6 +2034,7 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Register Amharic font for food names (download if not present)
         font_path = 'NotoSansEthiopic-Regular.ttf'
+        bold_font_path = 'NotoSansEthiopic-Bold.ttf'
         try:
             if not os.path.exists(font_path):
                 logger.info("Downloading Amharic font...")
@@ -2043,8 +2044,16 @@ async def admin_export_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 with open(font_path, 'wb') as f:
                     f.write(response.content)
                 logger.info("Font downloaded successfully.")
+            if not os.path.exists(bold_font_path):
+                logger.info("Downloading Amharic bold font...")
+                bold_url = "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansEthiopic/NotoSansEthiopic-Bold.ttf"
+                response = requests.get(bold_url)
+                response.raise_for_status()
+                with open(bold_font_path, 'wb') as f:
+                    f.write(response.content)
+                logger.info("Bold font downloaded successfully.")
             pdfmetrics.registerFont(TTFont('Amharic', font_path))
-            pdfmetrics.registerFont(TTFont('Amharic-Bold', font_path.replace('Regular', 'Bold')))
+            pdfmetrics.registerFont(TTFont('Amharic-Bold', bold_font_path))
             amharic_style = ParagraphStyle(
                 'AmharicStyle',
                 parent=styles['Normal'],
@@ -2441,7 +2450,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
 
             # Notify admin (edit original message safely)
             try:
-                await query.edit_message_text("✅ ክፍያ ተቀበለ።\n🚀 ተቀበለ!")
+                await query.edit_message_text("✅ ክፍያ ተቀበለ።\n🚀 ተ���በለ!")
             except Exception as e:
                 logger.warning(f"Could not edit admin message: {e}")
                 try:
@@ -2530,7 +2539,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                         logger.error(f"Failed to parse items for rejected order on {meal_date}: {parse_err}")
                         detailed_text += f"📅 {meal_date}: (ስህተት በምግብ ዝርዝር)\n"
             else:
-                detailed_text += "   (ምግቦች አልተገኙም)\n"
+                detailed_text += "   (ምግቦች አልተ���ኙም)\n"
 
             detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
             detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n"
