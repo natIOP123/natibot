@@ -310,6 +310,9 @@ def get_main_keyboard(user_id):
         ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
+def get_location_keyboard():
+    return ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+
 # Start command with updated onboarding message
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -2286,15 +2289,19 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
             )
             conn.commit()
             await query.edit_message_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
+            # Send rejection message to user and prompt to re-enter location with restricted keyboard
+            rejection_text = (
+                "❌ ቦታዎ ተውደቀ! እባክዎ እንደገና ይመዝገቡ።\n\n"
+                "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
+                "📍 **ለምሳሌ:**\n\n"
+                "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
+                "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
+                "🚀 ቦታዎን ያስገቡ!"
+            )
             await context.bot.send_message(
                 chat_id=user_id,
-                text="❌ ቦታዎ ተሰርዟል (ስህተት በማረጋገጥ ላይ)።\n\n"
-                     "📝 እባክዎ የመላኪያ ቦታዎን እንደገና ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
-                     "📍 **ለምሳሌ:**\n\n"
-                     "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
-                     "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
-                     "🚀 ቦታዎን እንደገና ያስገቡ!",
-                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+                text=rejection_text,
+                reply_markup=get_location_keyboard()
             )
     except Exception as e:
         logger.error(f"Error processing location callback for location {location_id}: {e}")
@@ -2398,7 +2405,6 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
             conn.close()
 
 # Handle payment approval/rejection callback
-# Handle payment approval/rejection callback
 async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -2491,18 +2497,17 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 logger.error(f"Failed to send approval message to user {user_id}: {send_err}")
 
         elif action == 'reject':
-            # Do not delete orders or subscription; set statuses to pending/rejected
-            cur.execute("UPDATE public.payments SET status = 'rejected' WHERE id = %s", (payment_id,))
-            cur.execute("UPDATE public.orders SET status = 'pending' WHERE subscription_id = %s", (subscription_id,))
-            # Keep subscription as 'pending'
-            conn.commit()
-
-            # Fetch orders for detailed message (before any further changes)
+            # Fetch before deletion
             cur.execute(
-                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s",
+                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
                 (subscription_id,)
             )
-            orders = cur.fetchall()
+            orders_before_delete = cur.fetchall()
+
+            cur.execute("UPDATE public.payments SET status = 'rejected' WHERE id = %s", (payment_id,))
+            cur.execute("DELETE FROM public.orders WHERE subscription_id = %s", (subscription_id,))
+            cur.execute("DELETE FROM public.subscriptions WHERE id = %s", (subscription_id,))
+            conn.commit()
 
             # Notify admin
             try:
@@ -2514,13 +2519,13 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 except:
                     pass
 
-            # Build rejection message for USER with re-upload prompt
+            # Build rejection message for USER
             detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
-            detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ (ስህተት በማረጋገጥ ላይ)!\n"
+            detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n"
 
-            if orders:
+            if orders_before_delete:
                 detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
-                for meal_date, items_json in orders:
+                for meal_date, items_json in orders_before_delete:
                     try:
                         items = json.loads(items_json) if isinstance(items_json, str) else items_json
                         if not isinstance(items, list):
@@ -2538,16 +2543,15 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 detailed_text += "   (ምግቦች አልተገኙም)\n"
 
             detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
-            detailed_text += "💳 እባክዎ አዲሱ ማረጋገጫ ምስል ያስገቡ (በዚህ ቀንበር ውስጥ ያስገቡ):\n\n"
-            detailed_text += "📤 አዲሱ ምስል ያስገቡ!\n\n"
-            detailed_text += "🔄 እንደገና ምስል ያስገቡ ቀጥል!"
+            detailed_text += "💳 እባክዎ ክፍያ ማረጋገጫ ምስል ዳግም ያስገቡ ወይም /select_meals ይጀምሩ።\n"
+            detailed_text += "🔄 እንደገና ይጀምሩ!"
 
-            # Send to USER with photo handler prompt
+            # Send to USER with prompt to re-upload or restart
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
                     text=detailed_text,
-                    reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([['🍴 /select_meals'], ['💬 ድጋፍ']], resize_keyboard=True)
                 )
             except Exception as send_err:
                 logger.error(f"Failed to send rejection message to user {user_id}: {send_err}")
@@ -2563,6 +2567,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             cur.close()
         if conn:
             conn.close()
+
 # My Subscription → My Info (keep as subscription details)
 async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
