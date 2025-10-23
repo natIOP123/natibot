@@ -334,6 +334,53 @@ def get_main_keyboard(user_id):
                 conn.close()
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
+# Start registration flow - smart skip based on existing data
+async def start_registration(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT full_name, phone_number, location FROM public.users WHERE telegram_id = %s", (user.id,))
+        user_data = cur.fetchone()
+        if user_data and user_data[0] and user_data[1] and user_data[2]:
+            await update.message.reply_text("✅ መመዝገቢያዎ ሙሉ ነው።", reply_markup=get_main_keyboard(user.id))
+            return MAIN_MENU
+        if not user_data or not user_data[0]:
+            await update.message.reply_text(
+                "📝 እባክዎ ሙሉ ስምዎን ያስገቡ።\n\n"
+                "🚀 ስምዎን ያስገቡ!",
+                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+            )
+            return REGISTER_NAME
+        if not user_data[1]:
+            await update.message.reply_text(
+                "📱 እባክዎ ስልክ ቁጥርዎን ያስገቡ (ለምሳሌ: 0912345678)።\n\n"
+                "🚀 ስልክ ቁጥርዎን ያስገቡ!",
+                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+            )
+            return REGISTER_PHONE
+        # Location missing
+        await update.message.reply_text(
+            "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
+            "📍 **ለምሳሌ:**\n\n"
+            "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
+            "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
+            "🚀 ቦታዎን ያስገቡ!",
+            reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+        )
+        return REGISTER_LOCATION
+    except Exception as e:
+        logger.error(f"Error in start_registration for user {user.id}: {e}")
+        await update.message.reply_text("❌ በመመዝገብ ላይ ስህተት ተከሰተ።\n\n🔄 /start ይጠቀሙ!", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
 # Start command with updated onboarding message
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -1135,31 +1182,39 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
             (user.id,)
         )
         pending = cur.fetchone()
-        if pending and pending[0] == 'approved':
-            choice = update.message.text
-            if choice in ['🍽️ የምሳ', '🥘 የእራት']:
-                return await choose_plan(update, context)
-            else:
-                await update.message.reply_text(
-                    "✅ ቦታዎ ተቀበለ!\n\n"
-                    "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
-                    "🍽️ የምሳ\n\n"
-                    "🥘 የእራት\n\n"
-                    "🚀 እቅድ ይምረጡ!",
-                    reply_markup=ReplyKeyboardMarkup(
-                        [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
-                        resize_keyboard=True
+        if pending:
+            status = pending[0]
+            if status == 'approved':
+                choice = update.message.text
+                if choice in ['🍽️ የምሳ', '🥘 የእራት']:
+                    return await choose_plan(update, context)
+                else:
+                    await update.message.reply_text(
+                        "✅ ቦታዎ ተቀበለ!\n\n"
+                        "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                        "🍽️ የምሳ\n\n"
+                        "🥘 የእራት\n\n"
+                        "🚀 እቅድ ይምረጡ!",
+                        reply_markup=ReplyKeyboardMarkup(
+                            [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                            resize_keyboard=True
+                        )
                     )
+                    return CHOOSE_PLAN
+            elif status == 'rejected':
+                await update.message.reply_text(
+                    "❌ ቦታዎ ተውደቀ። እባክዎ አዲሱን ቦታ ያስገቡ።",
+                    reply_markup=get_main_keyboard(user.id)
                 )
-                return CHOOSE_PLAN
-        else:
-            await update.message.reply_text(
-                "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
-                "🏠 ወደ መነሻ ገጽ ተመልሱ።\n\n"
-                "🔄 እባክዎ ይጠብቁ!",
-                reply_markup=get_main_keyboard(user.id)
-            )
-            return MAIN_MENU
+                return MAIN_MENU
+        # No pending or other status
+        await update.message.reply_text(
+            "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
+            "🏠 ወደ መነሻ ገጽ ተመልሱ።\n\n"
+            "🔄 እባክዎ ይጠብቁ!",
+            reply_markup=get_main_keyboard(user.id)
+        )
+        return MAIN_MENU
     except Exception as e:
         logger.error(f"Error in wait_location_approval for user {user.id}: {e}")
         await update.message.reply_text(
@@ -2416,13 +2471,11 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
                 "UPDATE public.pending_locations SET status = 'rejected' WHERE id = %s",
                 (location_id,)
             )
-            cur.execute("DELETE FROM public.pending_locations WHERE id = %s", (location_id,))
-            cur.execute("UPDATE public.users SET location = NULL WHERE telegram_id = %s", (user_id,))
             conn.commit()
             await query.edit_message_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
             await context.bot.send_message(
                 chat_id=user_id,
-                text="❌ ቦታዎ ተውደቀ። እባክዎ እንደገና ይመዝገቡ እና ቦታዎን ያስገቡ።\n\n"
+                text="❌ ቦታዎ ተውደቀ። እባክዎ አዲሱን ቦታ ያስገቡ።\n\n"
                      "📋 ይመዝገቡ ወይም /start ይጠቀሙ!",
                 reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
             )
@@ -3294,7 +3347,7 @@ def main():
                     MessageHandler(filters.Regex('^🔄 ትዕዛዙን መዘዋወር$'), reschedule_start),
                     MessageHandler(filters.Regex('^📞 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^💳 እንደገና ክፍያ ያስገቡ$'), payment_reupload_start),
-                    MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),
+                    MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), start_registration),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር አዘምን$'), admin_update_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር ሰርዝ$'), admin_delete_menu),
                     MessageHandler(filters.Regex('^🔐 ተመዝጋቢዎችን ተመልከት$'), admin_subscribers),
