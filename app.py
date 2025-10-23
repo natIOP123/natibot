@@ -2233,6 +2233,7 @@ async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_
             cur.close()
         if conn:
             conn.close()
+
 # Handle location approval/rejection callback
 async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -2251,7 +2252,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
         )
         location = cur.fetchone()
         if not location:
-            await query.edit_message_text("❌ ቦታ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n🔄 እንደገና ይመልከቱ!")
+            await query.edit_message_text("❌ ቦታ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n\n🔄 እንደገና ይመልከቱ!")
             return
         user_id, location_text = location
         if action == 'approve':
@@ -2264,14 +2265,14 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
                 (location_text, user_id)
             )
             conn.commit()
-            await query.edit_message_text("✅ ቦታ ተቀበለ።\n🚀 ተቀበለ!")
+            await query.edit_message_text("✅ ቦታ ተቀበለ።\n\n🚀 ተቀበለ!")
             # Send direct to subscription plan
             await context.bot.send_message(
                 chat_id=user_id,
-                text="✅ ቦታዎ ተቀበለ!\n"
-                     "📦 የምዝገባ እቅድዎን ይምረጡ:\n"
-                     "🍽️ የምሳ\n"
-                     "🥘 የእራት\n"
+                text="✅ ቦታዎ ተቀበለ!\n\n"
+                     "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                     "🍽️ የምሳ\n\n"
+                     "🥘 የእራት\n\n"
                      "🚀 እቅድ ይምረጡ!",
                 reply_markup=ReplyKeyboardMarkup(
                     [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
@@ -2284,26 +2285,22 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
                 (location_id,)
             )
             conn.commit()
-            await query.edit_message_text("❌ ቦታ ተውደቀ።\n🚫 ተውደቀ!")
+            await query.edit_message_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
             await context.bot.send_message(
                 chat_id=user_id,
-                text="❌ ቦታዎ ተውድቋል።\n"
-                     "📝 እባክዎ የመላኪያ ቦታዎን እንደገና በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n"
-                     "📍 **ለምሳሌ:**\n"
-                     "“Bole Edna mall, Alemnesh Plaza, office number 102”\n"
-                     "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n"
-                     "🚀 ቦታዎን እንደገና ያስገቡ!",
-                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+                text="❌ ቦታዎ ተሰርዟል።\n\n"
+                     "🔄 እባክዎ ከመጀመር ጋር እንደገና ይጀምሩ።\n\n"
+                     "🚀 /start ይጠቀሙ!",
+                reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
             )
     except Exception as e:
         logger.error(f"Error processing location callback for location {location_id}: {e}")
-        await query.edit_message_text("❌ የቦታ እርምጃ በማስተካከል ላይ ስህተት።\n🔄 እባክዎ እንደገና ይሞክሩ።")
+        await query.edit_message_text("❌ የቦታ እርምጃ በማስተካከል ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ።")
     finally:
         if cur:
             cur.close()
         if conn:
             conn.close()
-
 
 # Admin: Approve or reject payment
 async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2398,7 +2395,6 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
             conn.close()
 
 # Handle payment approval/rejection callback
-
 # Handle payment approval/rejection callback
 async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -2423,7 +2419,15 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             except:
                 await query.message.reply_text("❌ ክፍያ አልተሰጠም ወይም ቀደም ብሎ ተከፍሏል።\n🔄 እንደገና ይመልከቱ!")
             return
+
         user_id, subscription_id, amount = payment
+
+        # Fetch orders for detailed message
+        cur.execute(
+            "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
+            (subscription_id,)
+        )
+        orders = cur.fetchall()
 
         if action == 'approve':
             cur.execute(
@@ -2435,6 +2439,8 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 (subscription_id,)
             )
             conn.commit()
+
+            # Notify admin (edit original message safely)
             try:
                 await query.edit_message_text("✅ ክፍያ ተቀበለ።\n🚀 ተቀበለ!")
             except Exception as e:
@@ -2444,14 +2450,11 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 except:
                     pass
 
-            cur.execute(
-                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
-                (subscription_id,)
-            )
-            orders = cur.fetchall()
+            # Build confirmation message for USER
             detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
             detailed_text += f"✅ ክፍያዎ {amount:.2f} ብር ተቀበለ!\n"
             detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
+
             if not orders:
                 detailed_text += "   (ምግቦች አልተገኙም)\n"
             else:
@@ -2469,9 +2472,12 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                     except Exception as parse_err:
                         logger.error(f"Failed to parse items for order on {meal_date}: {parse_err}")
                         detailed_text += f"📅 {meal_date}: (ስህተት በምግብ ዝርዝር)\n"
+
             detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
             detailed_text += "🍴 ምግቦችዎ ዝግጁ ይሆናሉ!\n"
             detailed_text += "🚀 ተጠናቅቀው በደህና!"
+
+            # Send to USER
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
@@ -2482,9 +2488,19 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 logger.error(f"Failed to send approval message to user {user_id}: {send_err}")
 
         elif action == 'reject':
+            # Fetch before deletion
+            cur.execute(
+                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
+                (subscription_id,)
+            )
+            orders_before_delete = cur.fetchall()
+
             cur.execute("UPDATE public.payments SET status = 'rejected' WHERE id = %s", (payment_id,))
+            cur.execute("DELETE FROM public.orders WHERE subscription_id = %s", (subscription_id,))
+            cur.execute("DELETE FROM public.subscriptions WHERE id = %s", (subscription_id,))
             conn.commit()
 
+            # Notify admin
             try:
                 await query.edit_message_text("❌ ክፍያ ተውደቀ።\n🚫 ተውደቀ!")
             except Exception as e:
@@ -2494,68 +2510,42 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 except:
                     pass
 
-            # Re-fetch subscription and meal data to restore context
-            cur.execute(
-                "SELECT plan_type, meals_remaining, selected_dates FROM public.subscriptions WHERE id = %s",
-                (subscription_id,)
-            )
-            sub_data = cur.fetchone()
-            if not sub_data:
+            # Build rejection message for USER
+            detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
+            detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n"
+
+            if orders_before_delete:
+                detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
+                for meal_date, items_json in orders_before_delete:
+                    try:
+                        items = json.loads(items_json) if isinstance(items_json, str) else items_json
+                        if not isinstance(items, list):
+                            items = [items]
+                        item_lines = []
+                        for item in items:
+                            name = item.get('name', 'ያልታወቀ ምግብ')
+                            price = item.get('price', 0)
+                            item_lines.append(f"{name} ({price:.2f} ብር)")
+                        detailed_text += f"📅 {meal_date}: {', '.join(item_lines)}\n"
+                    except Exception as parse_err:
+                        logger.error(f"Failed to parse items for rejected order on {meal_date}: {parse_err}")
+                        detailed_text += f"📅 {meal_date}: (ስህተት በምግብ ዝርዝር)\n"
+            else:
+                detailed_text += "   (ምግቦች አልተገኙም)\n"
+
+            detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
+            detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n"
+            detailed_text += "🔄 እንደገና ይጀምሩ!"
+
+            # Send to USER
+            try:
                 await context.bot.send_message(
                     chat_id=user_id,
-                    text="❌ ስህተት: የምዝገባዎ መረጃ አልተገኘም።\n🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።",
+                    text=detailed_text,
                     reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
                 )
-                return
-
-            plan_type, meals_remaining, selected_dates_json = sub_data
-            selected_dates_en = json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json
-            valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            valid_days_am = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
-            selected_dates = [valid_days_am[valid_days_en.index(day)] for day in selected_dates_en]
-
-            today = datetime.now(EAT).date()
-            week_start = today - timedelta(days=today.weekday())
-            cur.execute("SELECT menu_items FROM public.weekly_menus WHERE week_start_date = %s", (week_start,))
-            menu_result = cur.fetchone()
-            if menu_result and menu_result[0]:
-                menu_items_from_db = json.loads(menu_result[0]) if isinstance(menu_result[0], str) else menu_result[0]
-                valid_menu_items = [
-                    item for item in menu_items_from_db 
-                    if isinstance(item, dict) and all(key in item for key in ['id', 'name', 'price', 'category'])
-                ]
-                menu_items = valid_menu_items if valid_menu_items else default_menu
-            else:
-                menu_items = default_menu
-
-            cur.execute(
-                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
-                (subscription_id,)
-            )
-            orders = cur.fetchall()
-            selected_meals = {}
-            for meal_date, items_json in orders:
-                items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                day_en = valid_days_en[meal_date.weekday()]
-                day_am = valid_days_am[valid_days_en.index(day_en)]
-                selected_meals[day_am] = [{'day': day_am, 'day_en': day_en, 'item': item, 'meal_date': meal_date} for item in items]
-
-            context.user_data['subscription_id'] = subscription_id
-            context.user_data['menu_items'] = menu_items
-            context.user_data['meals_remaining'] = meals_remaining
-            context.user_data['selected_dates'] = selected_dates
-            context.user_data['selected_dates_en'] = selected_dates_en
-            context.user_data['week_start'] = week_start
-            context.user_data['selected_meals'] = selected_meals
-            context.user_data['total_price'] = amount
-
-            await context.bot.send_message(
-                chat_id=user_id,
-                text="❌ ክፍያዎ ተውድቋል።\n"
-                     "💳 እባክዎ የክፍያ ማረጋገጫ ምስልዎን እንደገና ያስገቡ።\n"
-                     "📤 ምስል ያስገቡ!",
-                reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
-            )
+            except Exception as send_err:
+                logger.error(f"Failed to send rejection message to user {user_id}: {send_err}")
 
     except Exception as e:
         logger.error(f"Error processing payment callback for payment {payment_id}: {e}")
@@ -2568,7 +2558,6 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             cur.close()
         if conn:
             conn.close()
-
 # My Subscription → My Info (keep as subscription details)
 async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
