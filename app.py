@@ -2288,10 +2288,13 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
             await query.edit_message_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
             await context.bot.send_message(
                 chat_id=user_id,
-                text="❌ ቦታዎ ተሰርዟል።\n\n"
-                     "🔄 እባክዎ ከመጀመር ጋር እንደገና ይጀምሩ።\n\n"
-                     "🚀 /start ይጠቀሙ!",
-                reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
+                text="❌ ቦታዎ ተሰርዟል (ስህተት በማረጋገጥ ላይ)።\n\n"
+                     "📝 እባክዎ የመላኪያ ቦታዎን እንደገና ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
+                     "📍 **ለምሳሌ:**\n\n"
+                     "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
+                     "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
+                     "🚀 ቦታዎን እንደገና ያስገቡ!",
+                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
             )
     except Exception as e:
         logger.error(f"Error processing location callback for location {location_id}: {e}")
@@ -2488,17 +2491,18 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 logger.error(f"Failed to send approval message to user {user_id}: {send_err}")
 
         elif action == 'reject':
-            # Fetch before deletion
+            # Do not delete orders or subscription; set statuses to pending/rejected
+            cur.execute("UPDATE public.payments SET status = 'rejected' WHERE id = %s", (payment_id,))
+            cur.execute("UPDATE public.orders SET status = 'pending' WHERE subscription_id = %s", (subscription_id,))
+            # Keep subscription as 'pending'
+            conn.commit()
+
+            # Fetch orders for detailed message (before any further changes)
             cur.execute(
-                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
+                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s",
                 (subscription_id,)
             )
-            orders_before_delete = cur.fetchall()
-
-            cur.execute("UPDATE public.payments SET status = 'rejected' WHERE id = %s", (payment_id,))
-            cur.execute("DELETE FROM public.orders WHERE subscription_id = %s", (subscription_id,))
-            cur.execute("DELETE FROM public.subscriptions WHERE id = %s", (subscription_id,))
-            conn.commit()
+            orders = cur.fetchall()
 
             # Notify admin
             try:
@@ -2510,13 +2514,13 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 except:
                     pass
 
-            # Build rejection message for USER
+            # Build rejection message for USER with re-upload prompt
             detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
-            detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n"
+            detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ (ስህተት በማረጋገጥ ላይ)!\n"
 
-            if orders_before_delete:
+            if orders:
                 detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
-                for meal_date, items_json in orders_before_delete:
+                for meal_date, items_json in orders:
                     try:
                         items = json.loads(items_json) if isinstance(items_json, str) else items_json
                         if not isinstance(items, list):
@@ -2534,15 +2538,16 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 detailed_text += "   (ምግቦች አልተገኙም)\n"
 
             detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
-            detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n"
-            detailed_text += "🔄 እንደገና ይጀምሩ!"
+            detailed_text += "💳 እባክዎ አዲሱ ማረጋገጫ ምስል ያስገቡ (በዚህ ቀንበር ውስጥ ያስገቡ):\n\n"
+            detailed_text += "📤 አዲሱ ምስል ያስገቡ!\n\n"
+            detailed_text += "🔄 እንደገና ምስል ያስገቡ ቀጥል!"
 
-            # Send to USER
+            # Send to USER with photo handler prompt
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
                     text=detailed_text,
-                    reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
                 )
             except Exception as send_err:
                 logger.error(f"Failed to send rejection message to user {user_id}: {send_err}")
