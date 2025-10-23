@@ -68,9 +68,8 @@ default_menu = [
     CONFIRM_REGISTRATION, CHOOSE_PLAN, CHOOSE_DATE, MEAL_SELECTION, CONFIRM_MEAL, PAYMENT_UPLOAD,
     RESCHEDULE_MEAL, ADMIN_UPDATE_MENU, ADMIN_ANNOUNCE, ADMIN_DAILY_ORDERS,
     ADMIN_DELETE_MENU, SET_ADMIN_LOCATION, ADMIN_APPROVE_PAYMENT, SUPPORT_MENU,
-    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM,
-    PAYMENT_REUPLOAD
-) = range(24)
+    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM
+) = range(23)
 
 # Database connection helper
 def get_db_connection():
@@ -304,82 +303,12 @@ def get_main_keyboard(user_id):
             ['🔐 የሳምንቱን ሪፖርት አትም']
         ]
     else:
-        # Check if location is null for registration prompt
-        conn = None
-        cur = None
-        try:
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute("SELECT location FROM public.users WHERE telegram_id = %s", (user_id,))
-            location = cur.fetchone()
-            if location and location[0] is None:
-                keyboard = [['📋 ይመዝገቡ', '💬 ድጋፍ']]
-            else:
-                keyboard = [
-                    ['🍽 ምግብ ዝርዝር', '🛒 ምዝገባ'],
-                    ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች', '🔄 ትዕዛዙን መዘዋወር'],
-                    ['📞 ድጋፍ']
-                ]
-        except Exception as e:
-            logger.error(f"Error checking location for keyboard: {e}")
-            keyboard = [
-                ['🍽 ምግብ ዝርዝር', '🛒 ምዝገባ'],
-                ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች', '🔄 ትዕዛዙን መዘዋወር'],
-                ['📞 ድጋፍ']
-            ]
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
+        keyboard = [
+            ['🍽 ምግብ ዝርዝር', '🛒 ምዝገባ'],
+            ['👤 የእኔ መረጃ', '📅 የእኔ ምግቦች', '🔄 ትዕዛዙን መዘዋወር'],
+            ['📞 ድጋፍ']
+        ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-
-# Start registration flow - smart skip based on existing data
-async def start_registration(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    conn = None
-    cur = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT full_name, phone_number, location FROM public.users WHERE telegram_id = %s", (user.id,))
-        user_data = cur.fetchone()
-        if user_data and user_data[0] and user_data[1] and user_data[2]:
-            await update.message.reply_text("✅ መመዝገቢያዎ ሙሉ ነው።", reply_markup=get_main_keyboard(user.id))
-            return MAIN_MENU
-        if not user_data or not user_data[0]:
-            await update.message.reply_text(
-                "📝 እባክዎ ሙሉ ስምዎን ያስገቡ።\n\n"
-                "🚀 ስምዎን ያስገቡ!",
-                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
-            )
-            return REGISTER_NAME
-        if not user_data[1]:
-            await update.message.reply_text(
-                "📱 እባክዎ ስልክ ቁጥርዎን ያስገቡ (ለምሳሌ: 0912345678)።\n\n"
-                "🚀 ስልክ ቁጥርዎን ያስገቡ!",
-                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
-            )
-            return REGISTER_PHONE
-        # Location missing
-        await update.message.reply_text(
-            "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
-            "📍 **ለምሳሌ:**\n\n"
-            "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
-            "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
-            "🚀 ቦታዎን ያስገቡ!",
-            reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
-        )
-        return REGISTER_LOCATION
-    except Exception as e:
-        logger.error(f"Error in start_registration for user {user.id}: {e}")
-        await update.message.reply_text("❌ በመመዝገብ ላይ ስህተት ተከሰተ።\n\n🔄 /start ይጠቀሙ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
 
 # Start command with updated onboarding message
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1182,39 +1111,31 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
             (user.id,)
         )
         pending = cur.fetchone()
-        if pending:
-            status = pending[0]
-            if status == 'approved':
-                choice = update.message.text
-                if choice in ['🍽️ የምሳ', '🥘 የእራት']:
-                    return await choose_plan(update, context)
-                else:
-                    await update.message.reply_text(
-                        "✅ ቦታዎ ተቀበለ!\n\n"
-                        "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
-                        "🍽️ የምሳ\n\n"
-                        "🥘 የእራት\n\n"
-                        "🚀 እቅድ ይምረጡ!",
-                        reply_markup=ReplyKeyboardMarkup(
-                            [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
-                            resize_keyboard=True
-                        )
-                    )
-                    return CHOOSE_PLAN
-            elif status == 'rejected':
+        if pending and pending[0] == 'approved':
+            choice = update.message.text
+            if choice in ['🍽️ የምሳ', '🥘 የእራት']:
+                return await choose_plan(update, context)
+            else:
                 await update.message.reply_text(
-                    "❌ ቦታዎ ተውደቀ። እባክዎ አዲሱን ቦታ ያስገቡ።",
-                    reply_markup=get_main_keyboard(user.id)
+                    "✅ ቦታዎ ተቀበለ!\n\n"
+                    "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                    "🍽️ የምሳ\n\n"
+                    "🥘 የእራት\n\n"
+                    "🚀 እቅድ ይምረጡ!",
+                    reply_markup=ReplyKeyboardMarkup(
+                        [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                        resize_keyboard=True
+                    )
                 )
-                return MAIN_MENU
-        # No pending or other status
-        await update.message.reply_text(
-            "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
-            "🏠 ወደ መነሻ ገጽ ተመልሱ።\n\n"
-            "🔄 እባክዎ ይጠብቁ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
+                return CHOOSE_PLAN
+        else:
+            await update.message.reply_text(
+                "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
+                "🏠 ወደ መነሻ ገጽ ተመልሱ።\n\n"
+                "🔄 እባክዎ ይጠብቁ!",
+                reply_markup=get_main_keyboard(user.id)
+            )
+            return MAIN_MENU
     except Exception as e:
         logger.error(f"Error in wait_location_approval for user {user.id}: {e}")
         await update.message.reply_text(
@@ -1585,44 +1506,6 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
         valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
         valid_days_am = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
         selected_dates = [valid_days_am[valid_days_en.index(day)] for day in selected_dates_en]
-        # Check if orders already exist for these dates (for re-upload case)
-        orders_exist = False
-        cur.execute(
-            "SELECT COUNT(*) FROM public.orders WHERE user_id = %s AND status = 'confirmed'",
-            (user.id,)
-        )
-        if cur.fetchone()[0] > 0:
-            # Prompt for payment re-upload if subscription pending and orders exist
-            cur.execute(
-                "SELECT status FROM public.payments WHERE subscription_id = %s AND status = 'rejected' ORDER BY created_at DESC LIMIT 1",
-                (subscription_id,)
-            )
-            rejected_payment = cur.fetchone()
-            if rejected_payment:
-                total_price = 0
-                cur.execute(
-                    "SELECT items FROM public.orders WHERE subscription_id = %s",
-                    (subscription_id,)
-                )
-                order_items = cur.fetchall()
-                for _, items_json in order_items:
-                    items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                    total_price += sum(item['price'] for item in items)
-                context.user_data['total_price'] = total_price
-                context.user_data['subscription_id'] = subscription_id
-                await update.message.reply_text(
-                    f"💳 ክፍያዎ ተውደቀ። እባክዎ አዲሱን ማረጋገጫ ምስል ያስገቡ ለጠቅላላ {total_price:.2f} ብር።\n\n"
-                    "📤 ምስል ያስገቡ!",
-                    reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
-                )
-                return PAYMENT_REUPLOAD
-            orders_exist = True
-        if orders_exist:
-            await update.message.reply_text(
-                "✅ ምግቦችዎ ቀድሞ ተመረጡ። ለክፍያ ማረጋገጫ /my_meals ይመልከቱ።",
-                reply_markup=get_main_keyboard(user.id)
-            )
-            return MAIN_MENU
         # Fetch current menu
         today = datetime.now(EAT).date()
         week_start = today - timedelta(days=today.weekday())
@@ -1970,85 +1853,22 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return PAYMENT_UPLOAD
     return CONFIRM_MEAL
 
-# Payment re-upload handler
-async def payment_reupload_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if has_pending_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    conn = None
-    cur = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT s.id, s.plan_type, s.meals_remaining, s.selected_dates "
-            "FROM public.subscriptions s WHERE s.user_id = %s AND s.status = 'pending'",
-            (user.id,)
-        )
-        subscription = cur.fetchone()
-        if not subscription:
-            await update.message.reply_text(
-                "❌ ለክፍያ ማስታወሻ ተስማሚ ምዝገባ የለም።\n\n"
-                "🛒 /subscribe ይጀምሩ!",
-                reply_markup=get_main_keyboard(user.id)
-            )
-            return MAIN_MENU
-        subscription_id, plan_type, meals_remaining, selected_dates_json = subscription
-        selected_dates_en = json.loads(selected_dates_json) if isinstance(selected_dates_json, str) else selected_dates_json
-        # Calculate total price from existing orders
-        total_price = 0
-        cur.execute(
-            "SELECT items FROM public.orders WHERE subscription_id = %s",
-            (subscription_id,)
-        )
-        orders = cur.fetchall()
-        for _, items_json in orders:
-            items = json.loads(items_json) if isinstance(items_json, str) else items_json
-            total_price += sum(item['price'] for item in items)
-        if total_price <= 0:
-            await update.message.reply_text(
-                "❌ ምግብ ዝርዝር አልተገኘም። /select_meals ይጠቀሙ።",
-                reply_markup=get_main_keyboard(user.id)
-            )
-            return MAIN_MENU
-        context.user_data['subscription_id'] = subscription_id
-        context.user_data['total_price'] = total_price
-        await update.message.reply_text(
-            f"💳 ክፍያዎ ተውደቀ። እባክዎ አዲሱን ማረጋገጫ ምስል ያስገቡ ለጠቅላላ {total_price:.2f} ብር።\n\n"
-            "📤 ምስል ያስገቡ!",
-            reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
-        )
-        return PAYMENT_REUPLOAD
-    except Exception as e:
-        logger.error(f"Error starting payment reupload for user {user.id}: {e}")
-        await update.message.reply_text("❌ ክፍያ ማስታወሻ መጀመር ላይ ስህተት።\n\n🔄 /select_meals ይጠቀሙ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
-# Payment upload handler (unified for initial and re-upload)
 async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text and update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
-        context.user_data.clear()
         await update.message.reply_text(
             "❌ ምዝገባ ተሰርዟል።\n\n"
             "🔙 ወደ መነሻ ገጽ!",
             reply_markup=get_main_keyboard(user.id)
         )
+        context.user_data.clear()
         return MAIN_MENU
     if not update.message.photo:
-        total_price = context.user_data.get('total_price', 0)
-        prompt_text = f"💰 ጠቅላላ ዋጋ: {total_price:.2f} ብር\n\n" if total_price > 0 else ""
         await update.message.reply_text(
-            f"❌ {prompt_text}የክፍላ ማረጋገጫ ምስል ያስገቡ።\n\n"
+            "❌ የክፍላ ማረጋገጫ ምስል ያስገቡ።\n\n"
             "📤 ምስል ያስገቡ!\n\n"
             "🔄 እባክዎ ምስል ያስገቡ!",
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
@@ -2080,32 +1900,28 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         payment_id = cur.fetchone()[0]
         conn.commit()
-        # For initial upload, insert orders if not exist
-        cur.execute("SELECT COUNT(*) FROM public.orders WHERE subscription_id = %s", (subscription_id,))
-        if cur.fetchone()[0] == 0:
-            selected_meals = context.user_data.get('selected_meals', {})
-            orders_by_date = {}
-            for day in selected_meals:
-                for selection in selected_meals[day]:
-                    meal_date = selection['meal_date']
-                    if meal_date not in orders_by_date:
-                        orders_by_date[meal_date] = []
-                    orders_by_date[meal_date].append(selection['item'])
-            for meal_date, items in orders_by_date.items():
-                cur.execute(
-                    "INSERT INTO public.orders (user_id, subscription_id, meal_date, items, status) "
-                    "VALUES (%s, %s, %s, %s, %s)",
-                    (user.id, subscription_id, meal_date, json.dumps(items), 'confirmed')
-                )
-            conn.commit()
-        # Notify admins
+        selected_meals = context.user_data.get('selected_meals', {})
+        orders_by_date = {}
+        for day in selected_meals:
+            for selection in selected_meals[day]:
+                meal_date = selection['meal_date']
+                if meal_date not in orders_by_date:
+                    orders_by_date[meal_date] = []
+                orders_by_date[meal_date].append(selection['item'])
+        for meal_date, items in orders_by_date.items():
+            cur.execute(
+                "INSERT INTO public.orders (user_id, subscription_id, meal_date, items, status) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (user.id, subscription_id, meal_date, json.dumps(items), 'confirmed')
+            )
+        conn.commit()
         for admin_id in ADMIN_IDS:
             try:
                 try:
                     await context.bot.send_photo(
                         chat_id=admin_id,
                         photo=receipt_url,
-                        caption=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር (Subscription ID: {subscription_id})።\n\n"
+                        caption=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
                                 f"💳 እባክዎ ይፈትሹ።\n\n"
                                 "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
@@ -2117,9 +1933,9 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.error(f"Error sending photo to admin {admin_id} for payment {payment_id}: {e}")
                     await context.bot.send_message(
                         chat_id=admin_id,
-                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር (Subscription ID: {subscription_id})።\n\n"
+                        text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
                              f"⚠️ የማረጋገጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
-                             f"🔗 የማረጋገጫ File ID: {receipt_url}\n\n"
+                             "🔗 የማረጋገጫ File ID: {receipt_url}\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
                             [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
@@ -2128,22 +1944,19 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
             except Exception as e:
                 logger.error(f"Error notifying admin {admin_id} for payment {payment_id}: {e}")
-        # Notify about new order if initial
-        if context.user_data.get('selected_meals'):
-            order_text = f"🔔 ከተጠቃሚ {user.id} አዲስ ትዕዛዝ:\n\n"
-            selected_meals = context.user_data.get('selected_meals', {})
-            for day in selected_meals:
-                for selection in selected_meals[day]:
-                    order_text += f"- {selection['meal_date'].strftime('%Y-%m-%d')}: {selection['item']['name']}\n\n"
-            order_text += f"💰 ጠቅላላ: {total_price:.2f} ብር\n\n🔧 ትዕዛዝ ተቀበለ!"
-            for admin_id in ADMIN_IDS:
-                try:
-                    await context.bot.send_message(
-                        chat_id=admin_id,
-                        text=order_text
-                    )
-                except Exception as e:
-                    logger.error(f"Error notifying admin {admin_id} about new order: {e}")
+        order_text = f"🔔 ከተጠቃሚ {user.id} አዲስ ትዕዛዝ:\n\n"
+        for day in selected_meals:
+            for selection in selected_meals[day]:
+                order_text += f"- {selection['meal_date'].strftime('%Y-%m-%d')}: {selection['item']['name']}\n\n"
+        order_text += f"💰 ጠቅላላ: {total_price:.2f} ብር\n\n🔧 ትዕዛዝ ተቀበለ!"
+        for admin_id in ADMIN_IDS:
+            try:
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=order_text
+                )
+            except Exception as e:
+                logger.error(f"Error notifying admin {admin_id} about new order: {e}")
         await update.message.reply_text(
             "📤 ክፋዎ ተልኳል።\n\n"
             "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
@@ -2475,8 +2288,9 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
             await query.edit_message_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
             await context.bot.send_message(
                 chat_id=user_id,
-                text="❌ ቦታዎ ተውደቀ። እባክዎ አዲሱን ቦታ ያስገቡ።\n\n"
-                     "📋 ይመዝገቡ ወይም /start ይጠቀሙ!",
+                text="❌ ቦታዎ ተሰርዟል።\n\n"
+                     "🔄 እባክዎ ከመጀመር ጋር እንደገና ይጀምሩ።\n\n"
+                     "🚀 /start ይጠቀሙ!",
                 reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
             )
     except Exception as e:
@@ -2581,6 +2395,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
             conn.close()
 
 # Handle payment approval/rejection callback
+# Handle payment approval/rejection callback
 async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -2673,8 +2488,16 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 logger.error(f"Failed to send approval message to user {user_id}: {send_err}")
 
         elif action == 'reject':
+            # Fetch before deletion
+            cur.execute(
+                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
+                (subscription_id,)
+            )
+            orders_before_delete = cur.fetchall()
+
             cur.execute("UPDATE public.payments SET status = 'rejected' WHERE id = %s", (payment_id,))
-            # Do not delete orders or subscription - keep for re-upload
+            cur.execute("DELETE FROM public.orders WHERE subscription_id = %s", (subscription_id,))
+            cur.execute("DELETE FROM public.subscriptions WHERE id = %s", (subscription_id,))
             conn.commit()
 
             # Notify admin
@@ -2687,19 +2510,13 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 except:
                     pass
 
-            # Calculate total from orders
-            total_amount = 0
-            if orders:
-                for _, items_json in orders:
-                    items = json.loads(items_json) if isinstance(items_json, str) else items_json
-                    total_amount += sum(item['price'] for item in items)
-
             # Build rejection message for USER
             detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
             detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n"
-            if orders:
+
+            if orders_before_delete:
                 detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
-                for meal_date, items_json in orders:
+                for meal_date, items_json in orders_before_delete:
                     try:
                         items = json.loads(items_json) if isinstance(items_json, str) else items_json
                         if not isinstance(items, list):
@@ -2716,17 +2533,16 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             else:
                 detailed_text += "   (ምግቦች አልተገኙም)\n"
 
-            detailed_text += f"\n💰 ጠቅላላ መጠን: {total_amount:.2f} ብር\n"
-            detailed_text += "💳 እባክዎ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n"
-            detailed_text += "🔄 /select_meals ይጠቀሙ ለመቀጠል!"
+            detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
+            detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n"
+            detailed_text += "🔄 እንደገና ይጀምሩ!"
 
-            # Send to USER with re-upload prompt
+            # Send to USER
             try:
-                keyboard = [['💳 እንደገና ክፍያ ያስገቡ', '🔙 ተመለስ']]
                 await context.bot.send_message(
                     chat_id=user_id,
                     text=detailed_text,
-                    reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+                    reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
                 )
             except Exception as send_err:
                 logger.error(f"Failed to send rejection message to user {user_id}: {send_err}")
@@ -2742,7 +2558,6 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             cur.close()
         if conn:
             conn.close()
-
 # My Subscription → My Info (keep as subscription details)
 async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -3346,8 +3161,6 @@ def main():
                     MessageHandler(filters.Regex('^📅 የእኔ ምግቦች$'), my_meals),
                     MessageHandler(filters.Regex('^🔄 ትዕዛዙን መዘዋወር$'), reschedule_start),
                     MessageHandler(filters.Regex('^📞 ድጋፍ$'), support_menu),
-                    MessageHandler(filters.Regex('^💳 እንደገና ክፍያ ያስገቡ$'), payment_reupload_start),
-                    MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), start_registration),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር አዘምን$'), admin_update_menu),
                     MessageHandler(filters.Regex('^🔐 ምግብ ዝርዝር ሰርዝ$'), admin_delete_menu),
                     MessageHandler(filters.Regex('^🔐 ተመዝጋቢዎችን ተመልከት$'), admin_subscribers),
@@ -3359,6 +3172,7 @@ def main():
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን ተመልከት$'), view_locations),
                     MessageHandler(filters.Regex('^🔐 ቦታዎችን አረጋግጥ$'), admin_approve_locations),
                     MessageHandler(filters.Regex('^🔐 የሳምንቱን ሪፖርት አትም$'), admin_export_pdf),
+                    MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^⏳ ማረጋገጫ በመጠበቅ ላይ$'), lambda u, c: MAIN_MENU),  # Restricted
                 ],
@@ -3380,9 +3194,6 @@ def main():
                 ],
                 CONFIRM_MEAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_meal)],
                 PAYMENT_UPLOAD: [
-                    MessageHandler(filters.PHOTO | (filters.TEXT & ~filters.COMMAND), payment_upload)
-                ],
-                PAYMENT_REUPLOAD: [
                     MessageHandler(filters.PHOTO | (filters.TEXT & ~filters.COMMAND), payment_upload)
                 ],
                 RESCHEDULE_MEAL: [
