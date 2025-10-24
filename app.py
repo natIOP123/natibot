@@ -464,8 +464,8 @@ async def handle_location_submission_in_main(update: Update, context: ContextTyp
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        # Delete old rejected locations
-        cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'rejected'", (user.id,))
+        # Delete all old pending or rejected locations for this user
+        cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s", (user.id,))
         # Insert new pending location
         cur.execute(
             "INSERT INTO public.pending_locations (user_id, location_text) VALUES (%s, %s) RETURNING id",
@@ -646,8 +646,8 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        # Delete old rejected locations
-        cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'rejected'", (user.id,))
+        # Delete all old pending or rejected locations
+        cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s", (user.id,))
         # Insert into pending_locations
         cur.execute(
             "INSERT INTO public.pending_locations (user_id, location_text) VALUES (%s, %s) RETURNING id",
@@ -1202,8 +1202,8 @@ async def confirm_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             conn = get_db_connection()
             cur = conn.cursor()
-            # Delete old rejected locations
-            cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'rejected'", (user.id,))
+            # Delete all old pending or rejected locations
+            cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s", (user.id,))
             # Insert into pending_locations
             cur.execute(
                 "INSERT INTO public.pending_locations (user_id, location_text) VALUES (%s, %s) RETURNING id",
