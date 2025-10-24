@@ -1103,9 +1103,10 @@ async def confirm_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return CONFIRM_LOCATION
 
-# Updated Wait for location approval (handles rejected too)
+# Updated Wait for location approval (handles rejected too, with input processing for rejection)
 async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    location_text = update.message.text.strip() if update.message.text else None
     conn = None
     cur = None
     try:
@@ -1117,7 +1118,7 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
         )
         pending = cur.fetchone()
         if pending:
-            status, location_text = pending
+            status, old_location = pending
             if status == 'pending':
                 await update.message.reply_text(
                     "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
@@ -1127,24 +1128,58 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                 )
                 return WAIT_LOCATION_APPROVAL
             elif status == 'rejected':
-                # Clear the rejected record
+                # Delete the rejected record
                 cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'rejected'", (user.id,))
                 conn.commit()
-                await update.message.reply_text(
-                    f"❌ ቦታዎ ({location_text}) ተውደቀ።\n\n"
-                    "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
-                    "📍 **ለምሳሌ:**\n\n"
-                    "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
-                    "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
-                    "🚀 ቦታዎን እንደገና ያስገቡ!",
-                    reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
-                )
-                return USER_CHANGE_LOCATION  # Fixed: Return to USER_CHANGE_LOCATION to avoid loop
+                if location_text and location_text != '🔙 ተመለስ' and len(location_text) > 5:  # Assume it's a new location input
+                    # Process this message.text as new location
+                    # Insert into pending_locations
+                    cur.execute(
+                        "INSERT INTO public.pending_locations (user_id, location_text) VALUES (%s, %s) RETURNING id",
+                        (user.id, location_text)
+                    )
+                    pending_id = cur.fetchone()[0]
+                    conn.commit()
+                    # Notify admins
+                    for admin_id in ADMIN_IDS:
+                        try:
+                            keyboard = [
+                                [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{pending_id}"),
+                                 InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_location_{pending_id}")]
+                            ]
+                            reply_markup = InlineKeyboardMarkup(keyboard)
+                            await context.bot.send_message(
+                                chat_id=admin_id,
+                                text=f"🔔 አዲስ ቦታ ጥያቆ (re-submitted after rejection) ከተጠቃሚ {user.id}:\n\n📍 {location_text}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
+                                reply_markup=reply_markup
+                            )
+                        except Exception as e:
+                            logger.error(f"Error notifying admin {admin_id} about re-submitted location {pending_id}: {e}")
+                    await update.message.reply_text(
+                        f"📤 ቦታዎ ({location_text}) ተልኳል (re-submitted)።\n\n"
+                        "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
+                        "🚀 በትክክል ይጠብቁ!",
+                        reply_markup=get_main_keyboard(user.id)
+                    )
+                    context.user_data['pending_location_id'] = pending_id
+                    return WAIT_LOCATION_APPROVAL
+                else:
+                    # Not a valid location input, prompt for new
+                    await update.message.reply_text(
+                        f"❌ ቦታዎ ({old_location}) ተውደቀ።\n\n"
+                        "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
+                        "📍 **ለምሳሌ:**\n\n"
+                        "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
+                        "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
+                        "🚀 ቦታዎን እንደገና ያስገቡ!",
+                        reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+                    )
+                    return USER_CHANGE_LOCATION
             elif status == 'approved':
-                # Update user location and clear pending
+                # This should not happen as record is deleted in callback, but if it does
                 cur.execute(
                     "UPDATE public.users SET location = %s WHERE telegram_id = %s",
-                    (location_text, user.id)
+                    (old_location, user.id)
                 )
                 cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'approved'", (user.id,))
                 conn.commit()
@@ -1164,7 +1199,7 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                 else:
                     await update.message.reply_text(
                         "✅ ቦታዎ ተቀበለ!\n\n"
-                        "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                        "📦 የምዝገባ እቅድዎን ይምረጡ (/subscribe ይጠቀሙ):\n\n"
                         "🍽️ የምሳ\n\n"
                         "🥘 የእራት\n\n"
                         "🚀 እቅድ ይምረጡ!",
@@ -1175,13 +1210,43 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                     )
                     return CHOOSE_PLAN
         else:
-            await update.message.reply_text(
-                "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
-                "🏠 ወደ መነሻ ገጽ ተመልሱ።\n\n"
-                "🔄 እባክዎ ይጠብቁ!",
-                reply_markup=get_main_keyboard(user.id)
-            )
-            return MAIN_MENU
+            # No pending, check if user has location set
+            cur.execute("SELECT location FROM public.users WHERE telegram_id = %s", (user.id,))
+            user_location = cur.fetchone()
+            if user_location and user_location[0]:
+                # User has location, go to main or plan if no sub
+                cur.execute(
+                    "SELECT 1 FROM public.subscriptions WHERE user_id = %s AND status = 'active'",
+                    (user.id,)
+                )
+                has_active_sub = cur.fetchone() is not None
+                if has_active_sub:
+                    await update.message.reply_text(
+                        "🏠 ቦታዎ ተዘመነ ነው።\n\n"
+                        "🍽 ምርጫዎችዎን ይመልከቱ!",
+                        reply_markup=get_main_keyboard(user.id)
+                    )
+                    return MAIN_MENU
+                else:
+                    await update.message.reply_text(
+                        "📦 የምዝገባ እቅድዎን ይምረጡ (/subscribe ይጠቀሙ):\n\n"
+                        "🍽️ የምሳ\n\n"
+                        "🥘 የእራት\n\n"
+                        "🚀 እቅድ ይምረጡ!",
+                        reply_markup=ReplyKeyboardMarkup(
+                            [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                            resize_keyboard=True
+                        )
+                    )
+                    return CHOOSE_PLAN
+            else:
+                await update.message.reply_text(
+                    "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
+                    "🏠 ወደ መነሻ ገጽ ተመልሱ።\n\n"
+                    "🔄 እባክዎ ይጠብቁ!",
+                    reply_markup=get_main_keyboard(user.id)
+                )
+                return MAIN_MENU
     except Exception as e:
         logger.error(f"Error in wait_location_approval for user {user.id}: {e}")
         await update.message.reply_text(
@@ -1222,7 +1287,7 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
             return MAIN_MENU
         else:
             await update.message.reply_text(
-                "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                "📦 የምዝገባ እቅድዎን ይምረጡ (/subscribe ይጠቀሙ):\n\n"
                 "🍽️ የምሳ\n\n"
                 "🥘 የእራት\n\n"
                 "🚀 እቅድ ይምረጡ!",
@@ -1450,7 +1515,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [days_to_show[i:i+3] for i in range(0, len(days_to_show), 3)]
         keyboard.append(['ጨርስ', '🔙 ተመለስ'])
         await update.message.reply_text(
-            "❌ የማይሰራ ምርጫ።\n\n"
+            "❌ የ���ይሰራ ምርጫ።\n\n"
             "📅 እባክዎ ቀን ወይም 'ጨርስ' ይምረጠው።\n\n"
             "🔄 ትክክለኛ ምርጫ ይምረጠው!",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -2471,7 +2536,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
                 await context.bot.send_message(
                     chat_id=user_id,
                     text="✅ ቦታዎ ተቀበለ!\n\n"
-                         "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                         "📦 የምዝገባ እቅድዎን ይምረጡ (/subscribe ይጠቀሙ):\n\n"
                          "🍽️ የምሳ\n\n"
                          "🥘 የእራት\n\n"
                          "🚀 እቅድ ይምረጡ!",
