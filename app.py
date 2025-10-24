@@ -1139,7 +1139,7 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                     "🚀 ቦታዎን እንደገና ያስገቡ!",
                     reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
                 )
-                return REGISTER_LOCATION
+                return USER_CHANGE_LOCATION  # Fixed: Return to USER_CHANGE_LOCATION to avoid loop
             elif status == 'approved':
                 # Update user location and clear pending
                 cur.execute(
@@ -1148,18 +1148,32 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                 )
                 cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'approved'", (user.id,))
                 conn.commit()
-                await update.message.reply_text(
-                    "✅ ቦታዎ ተቀበለ!\n\n"
-                    "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
-                    "🍽️ የምሳ\n\n"
-                    "🥘 የእራት\n\n"
-                    "🚀 እቅድ ይምረጡ!",
-                    reply_markup=ReplyKeyboardMarkup(
-                        [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
-                        resize_keyboard=True
-                    )
+                # Check if user has active subscription to decide flow
+                cur.execute(
+                    "SELECT 1 FROM public.subscriptions WHERE user_id = %s AND status = 'active'",
+                    (user.id,)
                 )
-                return CHOOSE_PLAN
+                has_active_sub = cur.fetchone() is not None
+                if has_active_sub:
+                    await update.message.reply_text(
+                        "✅ ቦታዎ ተቀበለ!\n\n"
+                        "📦 ቦታዎ ተዘመነ። ወደ መነሻ ገጽ ተመልሱ።",
+                        reply_markup=get_main_keyboard(user.id)
+                    )
+                    return MAIN_MENU
+                else:
+                    await update.message.reply_text(
+                        "✅ ቦታዎ ተቀበለ!\n\n"
+                        "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                        "🍽️ የምሳ\n\n"
+                        "🥘 የእራት\n\n"
+                        "🚀 እቅድ ይምረጡ!",
+                        reply_markup=ReplyKeyboardMarkup(
+                            [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                            resize_keyboard=True
+                        )
+                    )
+                    return CHOOSE_PLAN
         else:
             await update.message.reply_text(
                 "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
@@ -2440,19 +2454,32 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
             cur.execute("DELETE FROM public.pending_locations WHERE id = %s", (location_id,))
             conn.commit()
             await query.edit_message_text("✅ ቦታ ተቀበለ።\n\n🚀 ተቀበለ!")
-            # Send direct to subscription plan
-            await context.bot.send_message(
-                chat_id=user_id,
-                text="✅ ቦታዎ ተቀበለ!\n\n"
-                     "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
-                     "🍽️ የምሳ\n\n"
-                     "🥘 የእራት\n\n"
-                     "🚀 እቅድ ይምረጡ!",
-                reply_markup=ReplyKeyboardMarkup(
-                    [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
-                    resize_keyboard=True
-                )
+            # Check if user has active subscription to decide flow
+            cur.execute(
+                "SELECT 1 FROM public.subscriptions WHERE user_id = %s AND status = 'active'",
+                (user_id,)
             )
+            has_active_sub = cur.fetchone() is not None
+            if has_active_sub:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="✅ ቦታዎ ተቀበለ!\n\n"
+                         "📦 ቦታዎ ተዘመነ። ወደ መነሻ ገጽ ተመልሱ።",
+                    reply_markup=get_main_keyboard(user_id)
+                )
+            else:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="✅ ቦታዎ ተቀበለ!\n\n"
+                         "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                         "🍽️ የምሳ\n\n"
+                         "🥘 የእራት\n\n"
+                         "🚀 እቅድ ይምረጡ!",
+                    reply_markup=ReplyKeyboardMarkup(
+                        [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                        resize_keyboard=True
+                    )
+                )
         elif action == 'reject':
             cur.execute(
                 "UPDATE public.pending_locations SET status = 'rejected' WHERE id = %s",
@@ -3085,7 +3112,7 @@ async def process_admin_announce(update: Update, context: ContextTypes.DEFAULT_T
                 )
             except Exception as e:
                 logger.error(f"Error sending announcement to user {user_id}: {e}")
-        await update.message.reply_text("✅ ማስታወቂያ ለሁሉም ተጠቃሚዎች ተ��ከ።\n\n🚀 ተላከ!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        await update.message.reply_text("✅ ማስታወቂያ ለሁሉም ተጠቃሚዎች ተላከ።\n\n🚀 ተላከ!\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     except Exception as e:
         logger.error(f"Error sending announcement: {e}")
