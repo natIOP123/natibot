@@ -68,9 +68,8 @@ default_menu = [
     CONFIRM_REGISTRATION, CHOOSE_PLAN, CHOOSE_DATE, MEAL_SELECTION, CONFIRM_MEAL, PAYMENT_UPLOAD,
     RESCHEDULE_MEAL, ADMIN_UPDATE_MENU, ADMIN_ANNOUNCE, ADMIN_DAILY_ORDERS,
     ADMIN_DELETE_MENU, SET_ADMIN_LOCATION, ADMIN_APPROVE_PAYMENT, SUPPORT_MENU,
-    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM,
-    CONFIRM_CHANGE_LOCATION
-) = range(24)
+    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM
+) = range(23)
 
 # Database connection helper
 def get_db_connection():
@@ -82,19 +81,38 @@ def get_db_connection():
         logger.error(f"Failed to connect to database: {e}")
         raise
 
-# Helper to check if user has pending location
-def has_pending_location(user_id):
+# Helper to check if user has location issue (pending or rejected)
+def has_location_issue(user_id):
     conn = None
     cur = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT status FROM public.pending_locations WHERE user_id = %s ORDER BY created_at DESC LIMIT 1", (user_id,))
+        cur.execute("SELECT 1 FROM public.pending_locations WHERE user_id = %s AND status IN ('pending', 'rejected')", (user_id,))
         result = cur.fetchone()
-        return result is not None and result[0] == 'pending'
+        return result is not None
     except Exception as e:
-        logger.error(f"Error checking pending location for user {user_id}: {e}")
+        logger.error(f"Error checking location issue for user {user_id}: {e}")
         return False
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+# Helper to get pending subscription for user
+def get_pending_subscription(user_id):
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM public.subscriptions WHERE user_id = %s AND status = 'pending'", (user_id,))
+        result = cur.fetchone()
+        return result[0] if result else None
+    except Exception as e:
+        logger.error(f"Error getting pending subscription for user {user_id}: {e}")
+        return None
     finally:
         if cur:
             cur.close()
@@ -291,8 +309,8 @@ def build_delete_menu_text(menu_items, week_start):
     return text
 
 def get_main_keyboard(user_id):
-    if has_pending_location(user_id):
-        # Restricted keyboard during location approval
+    if has_location_issue(user_id):
+        # Restricted keyboard during location approval/rejection
         keyboard = [['⏳ ማረጋገጫ በመጠበቅ ላይ', '💬 ድጋፍ']]
     elif user_id in ADMIN_IDS:
         keyboard = [
@@ -427,10 +445,144 @@ async def send_help_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     await update.message.reply_text(commands_text, reply_markup=get_main_keyboard(user.id))
 
+# Handle location submission in main menu (for re-submission after rejection)
+async def handle_location_submission_in_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not has_location_issue(user.id):
+        await update.message.reply_text("❌ የማይስተካከል መልእክት።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    location = update.message.text.strip()
+    if not location:
+        await update.message.reply_text(
+            "❌ ቦታ አልተስገበም። እባክዎ ቦታዎን በጽሑፍ ያስገቡ።\n\n"
+            "🔄 እባክዎ እንደገና ይሞክሩ!",
+            reply_markup=get_main_keyboard(user.id)
+        )
+        return MAIN_MENU
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # Delete old rejected locations
+        cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'rejected'", (user.id,))
+        # Insert new pending location
+        cur.execute(
+            "INSERT INTO public.pending_locations (user_id, location_text) VALUES (%s, %s) RETURNING id",
+            (user.id, location)
+        )
+        pending_id = cur.fetchone()[0]
+        conn.commit()
+        # Notify admins
+        for admin_id in ADMIN_IDS:
+            try:
+                keyboard = [
+                    [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{pending_id}"),
+                     InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_location_{pending_id}")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=f"🔔 አዲስ ቦታ ጥያቆ (ዳግም ማስተላለፍ) ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Error notifying admin {admin_id} about location {pending_id}: {e}")
+        await update.message.reply_text(
+            "📤 አዲሱ ቦታዎ ተልኳል።\n\n"
+            "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
+            "🚀 በትክክል ይጠብቁ!",
+            reply_markup=get_main_keyboard(user.id)
+        )
+        context.user_data['pending_location_id'] = pending_id
+        return WAIT_LOCATION_APPROVAL
+    except Exception as e:
+        logger.error(f"Error saving location for user {user.id}: {e}")
+        await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+        return MAIN_MENU
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+# Handle payment re-upload in main menu
+async def handle_payment_reupload_in_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    subscription_id = get_pending_subscription(user.id)
+    if not subscription_id:
+        await update.message.reply_text("❌ ለክፍያ ማስተላለፍ ተግባር የለም። /select_meals ይጠቀሙ።", reply_markup=get_main_keyboard(user.id))
+        return MAIN_MENU
+    # Reuse payment_upload logic
+    if not update.message.photo:
+        await update.message.reply_text(
+            "❌ የክፍያ ማረጋገጫ ምስል ያስገቡ።\n\n"
+            "📤 ምስል ያስገቡ!\n\n"
+            "🔄 እባክዎ ምስል ያስገቡ!",
+            reply_markup=get_main_keyboard(user.id)
+        )
+        return MAIN_MENU
+    photo = update.message.photo[-1]
+    receipt_url = photo.file_id
+    conn = None
+    cur = None
+    total_price = 0
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # Delete old rejected payments for this sub
+        cur.execute("DELETE FROM public.payments WHERE subscription_id = %s AND status = 'rejected'", (subscription_id,))
+        # Fetch total price from orders
+        cur.execute("SELECT SUM((items->>'price')::numeric) FROM public.orders WHERE subscription_id = %s", (subscription_id,))
+        price_result = cur.fetchone()[0]
+        total_price = price_result if price_result else 0
+        if total_price <= 0:
+            await update.message.reply_text("❌ የክፍያ መጠን የለም። /select_meals ይጀምሩ።", reply_markup=get_main_keyboard(user.id))
+            return MAIN_MENU
+        # Insert new pending payment
+        cur.execute(
+            "INSERT INTO public.payments (user_id, subscription_id, amount, receipt_url, status) "
+            "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (user.id, subscription_id, total_price, receipt_url, 'pending')
+        )
+        payment_id = cur.fetchone()[0]
+        conn.commit()
+        # Notify admins
+        for admin_id in ADMIN_IDS:
+            try:
+                keyboard = [
+                    [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
+                     InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_payment_{payment_id}")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=f"🔔 አዲስ ክፍያ ማስተላለፍ (ከተጠቃሚ {user.id}):\n\n💰 {total_price:.2f} ብር\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Error notifying admin {admin_id} about payment {payment_id}: {e}")
+        await update.message.reply_text(
+            "📤 አዲሱ ክፍያ ማረጋገጫ ተልኳል።\n\n"
+            "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
+            "🚀 በትክክል ይጠብቁ!",
+            reply_markup=get_main_keyboard(user.id)
+        )
+        return MAIN_MENU
+    except Exception as e:
+        logger.error(f"Error processing payment re-upload for user {user.id}: {e}")
+        await update.message.reply_text("❌ ክፍያ በማስቀመጥ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+        return MAIN_MENU
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
 # User Profile Handler
 async def user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_pending_location(user.id):
+    if has_location_issue(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
@@ -489,107 +641,57 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
         return USER_CHANGE_LOCATION
-    context.user_data['temp_location'] = location
-    # Show confirmation before sending to pending
-    registration_text = (
-        "📋 አዲሱ ቦታ:\n\n"
-        f"📍 የመላኪያ ቦታ: {location}\n\n"
-        "✅ መረጃውን ያረጋግጡ።\n\n"
-        "🔄 ትክክል ከሆነ 'ትክክል ነዋ' ይምረጡ፣ ካልሆነ 'አስተካክል' ይምረጡ።"
-    )
-    keyboard = [['ትክክል ነዋ', 'አስተካክል'], ['ሰርዝ', 'ተመለስ']]
-    await update.message.reply_text(
-        registration_text,
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
-    )
-    return CONFIRM_CHANGE_LOCATION
-
-# Confirm change location before sending to pending
-async def confirm_change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    choice = update.message.text
-    if choice == 'ተመለስ':
-        return await back_to_main(update, context)
-    elif choice == 'ሰርዝ':
-        context.user_data.clear()
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # Delete old rejected locations
+        cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'rejected'", (user.id,))
+        # Insert into pending_locations
+        cur.execute(
+            "INSERT INTO public.pending_locations (user_id, location_text) VALUES (%s, %s) RETURNING id",
+            (user.id, location)
+        )
+        pending_id = cur.fetchone()[0]
+        conn.commit()
+        # Notify admins
+        for admin_id in ADMIN_IDS:
+            try:
+                keyboard = [
+                    [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{pending_id}"),
+                     InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_location_{pending_id}")]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=f"🔔 አዲስ ቦታ ጥያቆ (ዳግም ማስተላለፍ) ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Error notifying admin {admin_id} about location {pending_id}: {e}")
         await update.message.reply_text(
-            "❌ ምዝገባ ተሰርዟል።\n\n🔙 ወደ መነሻ ገጽ!",
+            "📤 ቦታዎ ተልኳል።\n\n"
+            "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
+            "🚀 በትክክል ይጠብቁ!",
             reply_markup=get_main_keyboard(user.id)
         )
-        return MAIN_MENU
-    elif choice == 'አስተካክል':
-        # Go back to enter location
-        await update.message.reply_text(
-            "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
-            "📍 **ለምሳሌ:**\n\n"
-            "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
-            "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
-            "🚀 ቦታዎን ያስገቡ!",
-            reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
-        )
+        context.user_data['pending_location_id'] = pending_id
+        return WAIT_LOCATION_APPROVAL
+    except Exception as e:
+        logger.error(f"Error saving location for user {user.id}: {e}")
+        await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
         return USER_CHANGE_LOCATION
-    elif choice == 'ትክክል ነዋ':
-        location = context.user_data.get('temp_location')
-        conn = None
-        cur = None
-        try:
-            conn = get_db_connection()
-            cur = conn.cursor()
-            # Insert into pending_locations
-            cur.execute(
-                "INSERT INTO public.pending_locations (user_id, location_text) VALUES (%s, %s) RETURNING id",
-                (user.id, location)
-            )
-            pending_id = cur.fetchone()[0]
-            conn.commit()
-            # Notify admins
-            for admin_id in ADMIN_IDS:
-                try:
-                    keyboard = [
-                        [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{pending_id}"),
-                         InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_location_{pending_id}")]
-                    ]
-                    reply_markup = InlineKeyboardMarkup(keyboard)
-                    await context.bot.send_message(
-                        chat_id=admin_id,
-                        text=f"🔔 አዲስ ቦታ ጥያቆ ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
-                        reply_markup=reply_markup
-                    )
-                except Exception as e:
-                    logger.error(f"Error notifying admin {admin_id} about location {pending_id}: {e}")
-            await update.message.reply_text(
-                "📤 ቦታዎ ተልኳል።\n\n"
-                "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
-                "🚀 በትክክል ይጠብቁ!",
-                reply_markup=get_main_keyboard(user.id)
-            )
-            context.user_data['pending_location_id'] = pending_id
-            return WAIT_LOCATION_APPROVAL
-        except Exception as e:
-            logger.error(f"Error saving location for user {user.id}: {e}")
-            await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
-            return CONFIRM_CHANGE_LOCATION
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-    else:
-        await update.message.reply_text(
-            "❌ እባክዎ 'ትክክል ነዋ' ወይም 'አስተካክል' ይምረጡ።\n\n"
-            "🔄 ትክክለኛ ምርጫ ይምረጡ!",
-            reply_markup=ReplyKeyboardMarkup(
-                [['ትክክል ነዋ', 'አስተካክል'], ['ሰርዝ', 'ተመለስ']],
-                resize_keyboard=True,
-                one_time_keyboard=True
-            )
-        )
-        return CONFIRM_CHANGE_LOCATION
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 # Updated My Meals Handler
 async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_pending_location(user.id):
+    if has_location_issue(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if user.id in ADMIN_IDS:
@@ -655,7 +757,7 @@ async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Reschedule Start Handler
 async def reschedule_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_pending_location(user.id):
+    if has_location_issue(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if user.id in ADMIN_IDS:
@@ -1100,6 +1202,8 @@ async def confirm_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             conn = get_db_connection()
             cur = conn.cursor()
+            # Delete old rejected locations
+            cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'rejected'", (user.id,))
             # Insert into pending_locations
             cur.execute(
                 "INSERT INTO public.pending_locations (user_id, location_text) VALUES (%s, %s) RETURNING id",
@@ -1117,7 +1221,7 @@ async def confirm_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup = InlineKeyboardMarkup(keyboard)
                     await context.bot.send_message(
                         chat_id=admin_id,
-                        text=f"🔔 አዲስ ቦታ ጥያቆ ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
+                        text=f"🔔 አዲስ ቦታ ጥያቆ (ዳግም ማስተላለፍ) ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=reply_markup
                     )
                 except Exception as e:
@@ -1163,47 +1267,25 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
             "SELECT status FROM public.pending_locations WHERE user_id = %s ORDER BY created_at DESC LIMIT 1",
             (user.id,)
         )
-        result = cur.fetchone()
-        if not result:
-            await update.message.reply_text(
-                "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
-                "🏠 ወደ መነሻ ገጽ ተመልሱ።\n\n"
-                "🔄 እባክዎ ይጠብቁ!",
-                reply_markup=get_main_keyboard(user.id)
-            )
-            return MAIN_MENU
-        status = result[0]
-        if status == 'approved':
-            # Clean up approved pending
-            cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'approved' ORDER BY created_at DESC LIMIT 1", (user.id,))
-            # Check if has subscription
-            cur.execute("SELECT 1 FROM public.subscriptions WHERE user_id = %s AND status = 'active'", (user.id,))
-            has_sub = cur.fetchone()
+        pending = cur.fetchone()
+        if pending and pending[0] == 'approved':
             choice = update.message.text
-            if has_sub:
-                await update.message.reply_text(
-                    "✅ ቦታዎ ተቀበለ እና ተዘጋጅቷል!\n\n"
-                    "🔙 ወደ መነሻ ገጽ!",
-                    reply_markup=get_main_keyboard(user.id)
-                )
-                return MAIN_MENU
+            if choice in ['🍽️ የምሳ', '🥘 የእራት']:
+                return await choose_plan(update, context)
             else:
-                if choice in ['🍽️ የምሳ', '🥘 የእራት']:
-                    return await choose_plan(update, context)
-                else:
-                    await update.message.reply_text(
-                        "✅ ቦታዎ ተቀበለ!\n\n"
-                        "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
-                        "🍽️ የምሳ\n\n"
-                        "🥘 የእራት\n\n"
-                        "🚀 እቅድ ይምረጡ!",
-                        reply_markup=ReplyKeyboardMarkup(
-                            [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
-                            resize_keyboard=True
-                        )
+                await update.message.reply_text(
+                    "✅ ቦታዎ ተቀበለ!\n\n"
+                    "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                    "🍽️ የምሳ\n\n"
+                    "🥘 የእራት\n\n"
+                    "🚀 እቅድ ይምረጡ!",
+                    reply_markup=ReplyKeyboardMarkup(
+                        [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                        resize_keyboard=True
                     )
-                    return CHOOSE_PLAN
-        elif status == 'pending':
+                )
+                return CHOOSE_PLAN
+        else:
             await update.message.reply_text(
                 "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
                 "🏠 ወደ መነሻ ገጽ ተመልሱ።\n\n"
@@ -1276,7 +1358,7 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
 # Choose subscription plan
 async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_pending_location(user.id):
+    if has_location_issue(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if user.id in ADMIN_IDS:
@@ -1329,7 +1411,7 @@ async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Choose dates
 async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_pending_location(user.id):
+    if has_location_issue(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if user.id in ADMIN_IDS:
@@ -1489,7 +1571,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Show weekly menu
 async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_pending_location(user.id):
+    if has_location_issue(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     conn = None
@@ -1544,7 +1626,7 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Select meals
 async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_pending_location(user.id):
+    if has_location_issue(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if user.id in ADMIN_IDS:
@@ -1642,7 +1724,7 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_pending_location(user.id):
+    if has_location_issue(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     text = update.message.text.strip()
@@ -1856,7 +1938,7 @@ async def confirm_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
 
 async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_pending_location(user.id):
+    if has_location_issue(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text and update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
@@ -1930,7 +2012,7 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_pending_location(user.id):
+    if has_location_issue(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if update.message.text and update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
@@ -1968,6 +2050,8 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             context.user_data.clear()
             return MAIN_MENU
+        # Delete old rejected payments
+        cur.execute("DELETE FROM public.payments WHERE subscription_id = %s AND status = 'rejected'", (subscription_id,))
         cur.execute(
             "INSERT INTO public.payments (user_id, subscription_id, amount, receipt_url, status) "
             "VALUES (%s, %s, %s, %s, %s) RETURNING id",
@@ -2269,7 +2353,7 @@ async def admin_approve_locations(update: Update, context: ContextTypes.DEFAULT_
         cur.execute(
             "SELECT pl.id, u.full_name, u.username, pl.location_text "
             "FROM public.pending_locations pl JOIN public.users u ON pl.user_id = u.telegram_id "
-            "WHERE pl.status = 'pending' ORDER BY pl.created_at DESC"
+            "WHERE pl.status IN ('pending', 'rejected') ORDER BY pl.created_at DESC"
         )
         locations = cur.fetchall()
         if not locations:
@@ -2322,7 +2406,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
-            "SELECT user_id, location_text FROM public.pending_locations WHERE id = %s AND status = 'pending'",
+            "SELECT user_id, location_text FROM public.pending_locations WHERE id = %s AND status IN ('pending', 'rejected')",
             (location_id,)
         )
         location = cur.fetchone()
@@ -2332,51 +2416,42 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
         user_id, location_text = location
         if action == 'approve':
             cur.execute(
+                "UPDATE public.pending_locations SET status = 'approved' WHERE id = %s",
+                (location_id,)
+            )
+            cur.execute(
                 "UPDATE public.users SET location = %s WHERE telegram_id = %s",
                 (location_text, user_id)
             )
             cur.execute("DELETE FROM public.pending_locations WHERE id = %s", (location_id,))
             conn.commit()
             await query.edit_message_text("✅ ቦታ ተቀበለ።\n\n🚀 ተቀበለ!")
-            # Check if user has subscription to decide next step
-            cur.execute("SELECT id FROM public.subscriptions WHERE user_id = %s AND status = 'active'", (user_id,))
-            has_sub = cur.fetchone()
-            if not has_sub:
-                keyboard = [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']]
-                reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text="✅ ቦታዎ ተቀበለ!\n\n"
-                         "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
-                         "🍽️ የምሳ\n\n"
-                         "🥘 የእራት\n\n"
-                         "🚀 እቅድ ይምረጡ!",
-                    reply_markup=reply_markup
-                )
-            else:
-                await context.bot.send_message(
-                    chat_id=user_id,
-                    text="✅ ቦታዎ ተቀበለ እና ተዘጋጅቷል!\n\n"
-                         "🔙 ወደ መነሻ ገጽ!",
-                    reply_markup=get_main_keyboard(user_id)
-                )
-        elif action == 'reject':
-            cur.execute("DELETE FROM public.pending_locations WHERE id = %s", (location_id,))
-            conn.commit()
-            await query.edit_message_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
-            # Prompt user to re-enter location
-            prompt = (
-                "❌ ቦታዎ ተውደቀ! እባክዎ አዲሱን ቦታ ያስገቡ።\n\n"
-                "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
-                "📍 **ለምሳሌ:**\n\n"
-                "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
-                "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
-                "🚀 ቦታዎን ያስገቡ!"
-            )
+            # Send direct to subscription plan
             await context.bot.send_message(
                 chat_id=user_id,
-                text=prompt,
-                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+                text="✅ ቦታዎ ተቀበለ!\n\n"
+                     "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
+                     "🍽️ የምሳ\n\n"
+                     "🥘 የእራት\n\n"
+                     "🚀 እቅድ ይምረጡ!",
+                reply_markup=ReplyKeyboardMarkup(
+                    [['🍽️ የምሳ', '🥘 የእራት'], ['🔙 ተመለስ']],
+                    resize_keyboard=True
+                )
+            )
+        elif action == 'reject':
+            cur.execute(
+                "UPDATE public.pending_locations SET status = 'rejected' WHERE id = %s",
+                (location_id,)
+            )
+            conn.commit()
+            await query.edit_message_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="❌ ቦታዎ ተውደቀ! እባክዎ የመላኪያ ቦታዎን እንደገና ያስገቡ ለማረጋገጥ።\n\n"
+                     "📝 ቦታዎን ያስገቡ (ጽሑፍ ወይም Google Map Link):\n\n"
+                     "🚀 አዲሱን ቦታ ያስገቡ!",
+                reply_markup=get_main_keyboard(user_id)
             )
     except Exception as e:
         logger.error(f"Error processing location callback for location {location_id}: {e}")
@@ -2407,7 +2482,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
         if not payments:
             await update.message.reply_text(
                 "📭 ለፍተሻ ተጠባቂ ክፍያዎች የሉም።\n\n"
-                "�� ወደ መነሻ ገጽ!",
+                "🔙 ወደ መነሻ ገጽ!",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
@@ -2572,16 +2647,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 logger.error(f"Failed to send approval message to user {user_id}: {send_err}")
 
         elif action == 'reject':
-            # Fetch before deletion
-            cur.execute(
-                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
-                (subscription_id,)
-            )
-            orders_before_delete = cur.fetchall()
-
             cur.execute("UPDATE public.payments SET status = 'rejected' WHERE id = %s", (payment_id,))
-            cur.execute("DELETE FROM public.orders WHERE subscription_id = %s", (subscription_id,))
-            # Do NOT delete subscription, keep as 'pending'
             conn.commit()
 
             # Notify admin
@@ -2596,11 +2662,11 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
 
             # Build rejection message for USER
             detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
-            detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n"
+            detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ! እባክዎ እንደገና ያስገቡ (ምስል ያልፉ)።\n"
 
-            if orders_before_delete:
+            if orders:
                 detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
-                for meal_date, items_json in orders_before_delete:
+                for meal_date, items_json in orders:
                     try:
                         items = json.loads(items_json) if isinstance(items_json, str) else items_json
                         if not isinstance(items, list):
@@ -2618,8 +2684,8 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 detailed_text += "   (ምግቦች አልተገኙም)\n"
 
             detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
-            detailed_text += "🛒 እባክዎ ምግቦችዎን እንደገና ይምረጡ እና ክፍያ ይገቡ። /select_meals ይጠቀሙ\n"
-            detailed_text += "🔄 እንደገና ይጀምሩ!"
+            detailed_text += "💳 እባክዎ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n"
+            detailed_text += "🔄 እንደገና ይሞክሩ!"
 
             # Send to USER
             try:
@@ -2646,7 +2712,7 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
 # My Subscription → My Info (keep as subscription details)
 async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_pending_location(user.id):
+    if has_location_issue(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     if user.id in ADMIN_IDS:
@@ -3260,6 +3326,10 @@ def main():
                     MessageHandler(filters.Regex('^📋 ይመዝገቡ$'), register_name),
                     MessageHandler(filters.Regex('^💬 ድጋፍ$'), support_menu),
                     MessageHandler(filters.Regex('^⏳ ማረጋገጫ በመጠበቅ ላይ$'), lambda u, c: MAIN_MENU),  # Restricted
+                    # Handle location re-submission in main
+                    MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.Regex(r'^(🍽|🛒|👤|📅|🔄|📞|🔐|📋|💬|⏳|✅|⛔|ትክክል|አስተካክል|ሰርዝ|ተመለስ|🏠|ጨርስ)$'), handle_location_submission_in_main),
+                    # Handle payment re-upload in main
+                    MessageHandler(filters.PHOTO, handle_payment_reupload_in_main),
                 ],
                 REGISTER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_name)],
                 REGISTER_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, register_phone)],  # ✅ Manual only
@@ -3268,9 +3338,6 @@ def main():
                 ],
                 CONFIRM_LOCATION: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_location)
-                ],
-                CONFIRM_CHANGE_LOCATION: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_change_location)
                 ],
                 CONFIRM_REGISTRATION: [
                     MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_registration)
