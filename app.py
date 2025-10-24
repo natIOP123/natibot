@@ -91,7 +91,7 @@ def has_pending_location(user_id):
         cur = conn.cursor()
         cur.execute("SELECT status FROM public.pending_locations WHERE user_id = %s ORDER BY created_at DESC LIMIT 1", (user_id,))
         result = cur.fetchone()
-        return result is not None and result[0] in ('pending', 'rejected')
+        return result is not None and result[0] == 'pending'
     except Exception as e:
         logger.error(f"Error checking pending location for user {user_id}: {e}")
         return False
@@ -1211,23 +1211,6 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
-        elif status == 'rejected':
-            # Delete rejected pending
-            cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'rejected' ORDER BY created_at DESC LIMIT 1", (user.id,))
-            conn.commit()
-            # Check if new registration or change
-            cur.execute("SELECT location FROM public.users WHERE telegram_id = %s", (user.id,))
-            has_location = cur.fetchone()[0] is not None
-            prompt = (
-                "❌ ቦታዎ ተውደቀ! እባክዎ አዲሱን ቦታ ያስገቡ።\n\n"
-                "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
-                "📍 **ለምሳሌ:**\n\n"
-                "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
-                "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
-                "🚀 ቦታዎን ያስገቡ!"
-            )
-            await update.message.reply_text(prompt, reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True))
-            return REGISTER_LOCATION if not has_location else USER_CHANGE_LOCATION
     except Exception as e:
         logger.error(f"Error in wait_location_approval for user {user.id}: {e}")
         await update.message.reply_text(
@@ -2349,10 +2332,6 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
         user_id, location_text = location
         if action == 'approve':
             cur.execute(
-                "UPDATE public.pending_locations SET status = 'approved' WHERE id = %s",
-                (location_id,)
-            )
-            cur.execute(
                 "UPDATE public.users SET location = %s WHERE telegram_id = %s",
                 (location_text, user_id)
             )
@@ -2382,10 +2361,7 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
                     reply_markup=get_main_keyboard(user_id)
                 )
         elif action == 'reject':
-            cur.execute(
-                "UPDATE public.pending_locations SET status = 'rejected' WHERE id = %s",
-                (location_id,)
-            )
+            cur.execute("DELETE FROM public.pending_locations WHERE id = %s", (location_id,))
             conn.commit()
             await query.edit_message_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
             # Prompt user to re-enter location
@@ -2431,7 +2407,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
         if not payments:
             await update.message.reply_text(
                 "📭 ለፍተሻ ተጠባቂ ክፍያዎች የሉም።\n\n"
-                "🔙 ወደ መነሻ ገጽ!",
+                "�� ወደ መነሻ ገጽ!",
                 reply_markup=get_main_keyboard(user.id)
             )
             return MAIN_MENU
