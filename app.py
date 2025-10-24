@@ -485,7 +485,7 @@ async def change_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not location:
         await update.message.reply_text(
             "❌ ቦታ አልተስገበም። እባክዎ ቦታዎን በጽሑፍ ያስገቡ።\n\n"
-            "🔄 እባክዎ እንደገና ይሞክሩ!",
+            "🔄 እንደገና ይሞክሩ!",
             reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
         )
         return USER_CHANGE_LOCATION
@@ -1112,13 +1112,10 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute(
-            "SELECT status, location_text FROM public.pending_locations WHERE user_id = %s ORDER BY created_at DESC LIMIT 1",
-            (user.id,)
-        )
+        cur.execute("SELECT id, status, location_text FROM public.pending_locations WHERE user_id = %s ORDER BY created_at DESC LIMIT 1", (user.id,))
         pending = cur.fetchone()
         if pending:
-            status, old_location = pending
+            pending_id, status, old_location = pending
             if status == 'pending':
                 await update.message.reply_text(
                     "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
@@ -1128,17 +1125,12 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                 )
                 return WAIT_LOCATION_APPROVAL
             elif status == 'rejected':
-                # Delete the rejected record
-                cur.execute("DELETE FROM public.pending_locations WHERE user_id = %s AND status = 'rejected'", (user.id,))
-                conn.commit()
                 if location_text and location_text != '🔙 ተመለስ' and len(location_text) > 5:  # Assume it's a new location input
-                    # Process this message.text as new location
-                    # Insert into pending_locations
+                    # Update the existing record
                     cur.execute(
-                        "INSERT INTO public.pending_locations (user_id, location_text) VALUES (%s, %s) RETURNING id",
-                        (user.id, location_text)
+                        "UPDATE public.pending_locations SET location_text = %s, status = 'pending', created_at = CURRENT_TIMESTAMP WHERE id = %s",
+                        (location_text, pending_id)
                     )
-                    pending_id = cur.fetchone()[0]
                     conn.commit()
                     # Notify admins
                     for admin_id in ADMIN_IDS:
@@ -1161,7 +1153,6 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                         "🚀 በትክክል ይጠብቁ!",
                         reply_markup=get_main_keyboard(user.id)
                     )
-                    context.user_data['pending_location_id'] = pending_id
                     return WAIT_LOCATION_APPROVAL
                 else:
                     # Not a valid location input, prompt for new
@@ -1174,7 +1165,7 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                         "🚀 ቦታዎን እንደገና ያስገቡ!",
                         reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
                     )
-                    return USER_CHANGE_LOCATION
+                    return WAIT_LOCATION_APPROVAL
             elif status == 'approved':
                 # This should not happen as record is deleted in callback, but if it does
                 cur.execute(
@@ -1375,7 +1366,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     valid_days_am = ['ሰኞ', 'ማክሰኞ', 'እሮብ', 'ሐሙስ', 'አርብ', 'ቅዳሜ', 'እሑድ']
     valid_days_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     current_weekday = datetime.now(EAT).weekday()
-    days_to_show = [valid_days_am[i] for i in range(current_weekday, 7)]
+    days_to_show = [valid_days_am[i] for i in range(current_weekday, len(valid_days_am))]
     if choice == '🔙 ተመለስ':
         await update.message.reply_text(
             "📦 የምዝገባ እቅድዎን ይምረጡ:\n\n"
@@ -1515,7 +1506,7 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [days_to_show[i:i+3] for i in range(0, len(days_to_show), 3)]
         keyboard.append(['ጨርስ', '🔙 ተመለስ'])
         await update.message.reply_text(
-            "❌ የ���ይሰራ ምርጫ።\n\n"
+            "❌ የማይሰራ ምርጫ።\n\n"
             "📅 እባክዎ ቀን ወይም 'ጨርስ' ይምረጠው።\n\n"
             "🔄 ትክክለኛ ምርጫ ይምረጠው!",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -1964,7 +1955,7 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return PAYMENT_UPLOAD
     return CONFIRM_MEAL
 
-# Wait for payment approval (new handler for PAYMENT_PENDING state)
+# Wait for payment approval
 async def wait_payment_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     conn = None
@@ -1987,7 +1978,6 @@ async def wait_payment_approval(update: Update, context: ContextTypes.DEFAULT_TY
                 )
                 return PAYMENT_PENDING
             elif status == 'approved':
-                # Send confirmation if not already (but callback already sends)
                 await update.message.reply_text(
                     "✅ ክፍያዎ ተቀበለ! ምግቦችዎ ተጠናቅቀዋል።\n\n"
                     "🚀 ወደ መነሻ ገጽ!",
@@ -2026,9 +2016,6 @@ async def wait_payment_approval(update: Update, context: ContextTypes.DEFAULT_TY
 # Payment re-upload handler (for PAYMENT_PENDING state)
 async def payment_reupload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if has_unapproved_location(user.id):
-        await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
     if not update.message.photo:
         await update.message.reply_text(
             "❌ የክፍያ ማረጋገጫ ምስል ያስገቡ።\n\n"
@@ -2186,7 +2173,7 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.send_message(
                         chat_id=admin_id,
                         text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፋ {total_price:.2f} ብር።\n\n"
-                             f"⚠️ የማረጋገጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
+                             f"⚠️ የየማረጋገጫ ምስል መላክ አልተሳካም (ስህተት: {str(e)})።\n\n"
                              f"🔗 የማረጋገጫ File ID: {receipt_url}\n\n"
                              "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
                         reply_markup=InlineKeyboardMarkup([
@@ -2862,8 +2849,7 @@ async def admin_update_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return MAIN_MENU
     await update.message.reply_text(
         "📋 አዲሱን ምግብ ዝርዝር በJSON ቅርጽ ያስገቡ (ለምሳሌ፣ [{'id': 1, 'name': 'Dish', 'price': 100, 'day': 'Monday', 'category': 'fasting'}])።\n\n"
-        "🔧 JSON ቅርጽ ያስገቡ!\n\n"
-        "🚀 ዝርዝር ያዘምኑ!",
+        "🔧 JSON ቅርጽ ያስገቡ ቦታ ያዘምኑ!",
         reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
     )
     return ADMIN_UPDATE_MENU
@@ -3195,7 +3181,7 @@ async def process_set_admin_location(update: Update, context: ContextTypes.DEFAU
     if user.id not in ADMIN_IDS:
         await update.message.reply_text("❌ አስተዳዳሪ አይደሉም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
-    if update.message.text in ['🔙 ተመለስ', 'ዝለል']:
+    if update.message.text == '🔙 ተመለስ':
         await update.message.reply_text("❌ ቦታ ማዘጋጀት ተሰርዟል።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
     location = None
@@ -3493,5 +3479,4 @@ def main():
         logger.error(f"Error starting bot: {e}")
 
 if __name__ == '__main__':
-    
     main()
