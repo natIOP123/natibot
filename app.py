@@ -68,9 +68,8 @@ default_menu = [
     CONFIRM_REGISTRATION, CHOOSE_PLAN, CHOOSE_DATE, MEAL_SELECTION, CONFIRM_MEAL, PAYMENT_UPLOAD,
     RESCHEDULE_MEAL, ADMIN_UPDATE_MENU, ADMIN_ANNOUNCE, ADMIN_DAILY_ORDERS,
     ADMIN_DELETE_MENU, SET_ADMIN_LOCATION, ADMIN_APPROVE_PAYMENT, SUPPORT_MENU,
-    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM,
-    PAYMENT_REUPLOAD
-) = range(24)
+    WAIT_LOCATION_APPROVAL, USER_CHANGE_LOCATION, RESCHEDULE_DATE, RESCHEDULE_CONFIRM
+) = range(23)
 
 # Database connection helper
 def get_db_connection():
@@ -371,9 +370,6 @@ async def support_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Back to main menu
 async def back_to_main(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    # Clear reupload mode when going back to main
-    if context.user_data.get('reupload_mode'):
-        context.user_data['reupload_mode'] = False
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT full_name, phone_number, location FROM public.users WHERE telegram_id = %s", (user.id,))
@@ -435,14 +431,6 @@ async def user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
         return MAIN_MENU
     conn = None
     cur = None
@@ -551,14 +539,6 @@ async def my_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
     if user.id in ADMIN_IDS:
         await update.message.reply_text("❌ አስተዳዳሪዎች ምግብ ዝርዝር አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
@@ -624,14 +604,6 @@ async def reschedule_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
         return MAIN_MENU
     if user.id in ADMIN_IDS:
         await update.message.reply_text("❌ አስተዳዳሪዎች ማዘዋወር አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
@@ -710,14 +682,6 @@ async def reschedule_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Process Reschedule Order Selection
 async def process_reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
     text = update.message.text.strip()
     if text == '🔙 ተመለስ':
         context.user_data.pop('eligible_orders', None)
@@ -792,14 +756,6 @@ async def process_reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # Reschedule Date Selection
 async def reschedule_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
     text = update.message.text.strip()
     if text == '🔙 ተመለስ':
         context.user_data.pop('eligible_orders', None)
@@ -858,14 +814,6 @@ async def reschedule_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Confirm Reschedule
 async def confirm_reschedule(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
     choice = update.message.text
     if choice == '🔙 ተመለስ':
         context.user_data.pop('eligible_orders', None)
@@ -1310,14 +1258,6 @@ async def choose_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
     if user.id in ADMIN_IDS:
         await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
@@ -1370,14 +1310,6 @@ async def choose_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
         return MAIN_MENU
     if user.id in ADMIN_IDS:
         await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
@@ -1539,14 +1471,6 @@ async def show_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
     conn = None
     cur = None
     try:
@@ -1601,14 +1525,6 @@ async def select_meals(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
         return MAIN_MENU
     if user.id in ADMIN_IDS:
         await update.message.reply_text("❌ አስተዳዳሪዎች ምግብ ምርጫ አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
@@ -1707,14 +1623,6 @@ async def process_meal_selection(update: Update, context: ContextTypes.DEFAULT_T
     user = update.effective_user
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
         return MAIN_MENU
     text = update.message.text.strip()
     menu_items = context.user_data.get('menu_items', [])
@@ -1930,14 +1838,6 @@ async def confirm_meal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
         return MAIN_MENU
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return MAIN_MENU
     if update.message.text and update.message.text.lower() in ['ሰርዝ', '🔙 ተመለስ']:
         context.user_data.clear()
         await update.message.reply_text(
@@ -2053,22 +1953,21 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (user.id, subscription_id, total_price, receipt_url, 'pending')
         )
         payment_id = cur.fetchone()[0]
-        # Create orders only if this is initial upload (not reupload)
-        if not context.user_data.get('reupload_mode', False):
-            selected_meals = context.user_data.get('selected_meals', {})
-            orders_by_date = {}
-            for day in selected_meals:
-                for selection in selected_meals[day]:
-                    meal_date = selection['meal_date']
-                    if meal_date not in orders_by_date:
-                        orders_by_date[meal_date] = []
-                    orders_by_date[meal_date].append(selection['item'])
-            for meal_date, items in orders_by_date.items():
-                cur.execute(
-                    "INSERT INTO public.orders (user_id, subscription_id, meal_date, items, status) "
-                    "VALUES (%s, %s, %s, %s, %s)",
-                    (user.id, subscription_id, meal_date, json.dumps(items), 'confirmed')
-                )
+        conn.commit()
+        selected_meals = context.user_data.get('selected_meals', {})
+        orders_by_date = {}
+        for day in selected_meals:
+            for selection in selected_meals[day]:
+                meal_date = selection['meal_date']
+                if meal_date not in orders_by_date:
+                    orders_by_date[meal_date] = []
+                orders_by_date[meal_date].append(selection['item'])
+        for meal_date, items in orders_by_date.items():
+            cur.execute(
+                "INSERT INTO public.orders (user_id, subscription_id, meal_date, items, status) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (user.id, subscription_id, meal_date, json.dumps(items), 'confirmed')
+            )
         conn.commit()
         for admin_id in ADMIN_IDS:
             try:
@@ -2099,31 +1998,25 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
             except Exception as e:
                 logger.error(f"Error notifying admin {admin_id} for payment {payment_id}: {e}")
-        # Notify admins about orders if initial
-        if not context.user_data.get('reupload_mode', False):
-            order_text = f"🔔 ከተጠቃሚ {user.id} አዲስ ትዕዛዝ:\n\n"
-            selected_meals = context.user_data.get('selected_meals', {})
-            for day in selected_meals:
-                for selection in selected_meals[day]:
-                    order_text += f"- {selection['meal_date'].strftime('%Y-%m-%d')}: {selection['item']['name']}\n\n"
-            order_text += f"💰 ጠቅላላ: {total_price:.2f} ብር\n\n🔧 ትዕዛዝ ተቀበለ!"
-            for admin_id in ADMIN_IDS:
-                try:
-                    await context.bot.send_message(
-                        chat_id=admin_id,
-                        text=order_text
-                    )
-                except Exception as e:
-                    logger.error(f"Error notifying admin {admin_id} about new order: {e}")
+        order_text = f"🔔 ከተጠቃሚ {user.id} አዲስ ትዕዛዝ:\n\n"
+        for day in selected_meals:
+            for selection in selected_meals[day]:
+                order_text += f"- {selection['meal_date'].strftime('%Y-%m-%d')}: {selection['item']['name']}\n\n"
+        order_text += f"💰 ጠቅላላ: {total_price:.2f} ብር\n\n🔧 ትዕዛዝ ተቀበለ!"
+        for admin_id in ADMIN_IDS:
+            try:
+                await context.bot.send_message(
+                    chat_id=admin_id,
+                    text=order_text
+                )
+            except Exception as e:
+                logger.error(f"Error notifying admin {admin_id} about new order: {e}")
         await update.message.reply_text(
             "📤 ክፋዎ ተልኳል።\n\n"
             "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
             "🚀 በትክክል ይጠብቁ!",
             reply_markup=get_main_keyboard(user.id)
         )
-        # Clear reupload mode if set
-        if context.user_data.get('reupload_mode'):
-            context.user_data['reupload_mode'] = False
         context.user_data.clear()
         return MAIN_MENU
     except Exception as e:
@@ -2134,92 +2027,6 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=ReplyKeyboardMarkup([['ሰርዝ', '🔙 ተመለስ']], resize_keyboard=True)
         )
         return PAYMENT_UPLOAD
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-
-# Handle reupload payment (global handler for photos when reupload_mode is True)
-async def handle_reupload_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    if not context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "❌ ይህ ምስል ለክፍያ አይደለም። /select_meals ይጠቀሙ ወይም ተገቢ እርምጃ ይጀምሩ።",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return
-    if not update.message.photo:
-        await update.message.reply_text(
-            "❌ እባክዎ ክፍያ ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        return
-    photo = update.message.photo[-1]
-    receipt_url = photo.file_id
-    subscription_id = context.user_data.get('subscription_id')
-    total_price = context.user_data.get('total_price', 0)
-    if not subscription_id or total_price <= 0:
-        logger.error(f"Missing subscription_id or total_price for reupload by user {user.id}")
-        await update.message.reply_text(
-            "❌ ስህተት በመመዝገቢያ መረጃ። እባክዎ ከመጀመሪያው ይጀምሩ።",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        context.user_data['reupload_mode'] = False
-        return
-    conn = None
-    cur = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO public.payments (user_id, subscription_id, amount, receipt_url, status) "
-            "VALUES (%s, %s, %s, %s, %s) RETURNING id",
-            (user.id, subscription_id, total_price, receipt_url, 'pending')
-        )
-        payment_id = cur.fetchone()[0]
-        conn.commit()
-        # Notify admins with new photo
-        for admin_id in ADMIN_IDS:
-            try:
-                await context.bot.send_photo(
-                    chat_id=admin_id,
-                    photo=receipt_url,
-                    caption=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ ማረጋገጫ (ዳግም ለማረጋገጥ) {total_price:.2f} ብር።\n\n"
-                            f"💳 እባክዎ ይፈትሹ።\n\n"
-                            "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
-                         InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_payment_{payment_id}")]
-                    ])
-                )
-            except Exception as e:
-                logger.error(f"Error notifying admin {admin_id} for reupload payment {payment_id}: {e}")
-                await context.bot.send_message(
-                    chat_id=admin_id,
-                    text=f"🔔 ከተጠቃሚ {user.id} አዲስ ክፍያ ማረጋገጫ (ዳግም) {total_price:.2f} ብር።\n\n"
-                         f"🔗 File ID: {receipt_url}\n\n"
-                         "🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_payment_{payment_id}"),
-                         InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_payment_{payment_id}")]
-                    ])
-                )
-        await update.message.reply_text(
-            "📤 አዲሱ ክፍያ ማረጋገጫዎ ተልኳል።\n\n"
-            "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
-            "🚀 በትክክል ይጠብቁ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
-        context.user_data['reupload_mode'] = False
-    except Exception as e:
-        logger.error(f"Error processing reupload payment for user {user.id}: {e}")
-        await update.message.reply_text(
-            "❌ አዲሱ ማረጋገጫ በማስገባት ላይ ስህተት።\n\n"
-            "🔄 እባክዎ እንደገና ይሞክሩ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
     finally:
         if cur:
             cur.close()
@@ -2648,6 +2455,7 @@ async def admin_approve_payment(update: Update, context: ContextTypes.DEFAULT_TY
             conn.close()
 
 # Handle payment approval/rejection callback
+# Handle payment approval/rejection callback
 async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -2739,18 +2547,18 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             except Exception as send_err:
                 logger.error(f"Failed to send approval message to user {user_id}: {send_err}")
 
-            # Clear reupload mode if set
-            if context.user_data.get('reupload_mode'):
-                context.user_data['reupload_mode'] = False
-
         elif action == 'reject':
-            cur.execute("UPDATE public.payments SET status = 'rejected' WHERE id = %s", (payment_id,))
-            conn.commit()
+            # Fetch before deletion
+            cur.execute(
+                "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
+                (subscription_id,)
+            )
+            orders_before_delete = cur.fetchall()
 
-            # Set reupload mode for user
-            context.user_data['reupload_mode'] = True
-            context.user_data['subscription_id'] = subscription_id
-            context.user_data['total_price'] = amount
+            cur.execute("UPDATE public.payments SET status = 'rejected' WHERE id = %s", (payment_id,))
+            cur.execute("DELETE FROM public.orders WHERE subscription_id = %s", (subscription_id,))
+            cur.execute("DELETE FROM public.subscriptions WHERE id = %s", (subscription_id,))
+            conn.commit()
 
             # Notify admin
             try:
@@ -2765,15 +2573,36 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             # Build rejection message for USER
             detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
             detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n"
-            detailed_text += "📤 እባክዎ አዲሱ ማረጋገጫ ምስል ያስገቡ ለመቀጠል።\n\n"
-            detailed_text += f"💰 መጠን: {amount:.2f} ብር\n\n"
-            detailed_text += "📤 አዲሱ ምስል ያስገቡ!"
+
+            if orders_before_delete:
+                detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
+                for meal_date, items_json in orders_before_delete:
+                    try:
+                        items = json.loads(items_json) if isinstance(items_json, str) else items_json
+                        if not isinstance(items, list):
+                            items = [items]
+                        item_lines = []
+                        for item in items:
+                            name = item.get('name', 'ያልታወቀ ምግብ')
+                            price = item.get('price', 0)
+                            item_lines.append(f"{name} ({price:.2f} ብር)")
+                        detailed_text += f"📅 {meal_date}: {', '.join(item_lines)}\n"
+                    except Exception as parse_err:
+                        logger.error(f"Failed to parse items for rejected order on {meal_date}: {parse_err}")
+                        detailed_text += f"📅 {meal_date}: (ስህተት በምግብ ዝርዝር)\n"
+            else:
+                detailed_text += "   (ምግቦች አልተገኙም)\n"
+
+            detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
+            detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n"
+            detailed_text += "🔄 እንደገና ይጀምሩ!"
 
             # Send to USER
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
-                    text=detailed_text
+                    text=detailed_text,
+                    reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
                 )
             except Exception as send_err:
                 logger.error(f"Failed to send rejection message to user {user_id}: {send_err}")
@@ -2789,20 +2618,11 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             cur.close()
         if conn:
             conn.close()
-
 # My Subscription → My Info (keep as subscription details)
 async def my_subscription(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if has_pending_location(user.id):
         await update.message.reply_text("⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው። እባክዎ ይጠብቁ።\n\n🔄 እባክዎ ይጠብቁ!", reply_markup=get_main_keyboard(user.id))
-        return MAIN_MENU
-    # Check for reupload mode
-    if context.user_data.get('reupload_mode'):
-        await update.message.reply_text(
-            "⏳ የክፍያዎ ማረጋገጫ በመጠበቅ ላይ ነው። ከቀደምት ክፍያ ተውደቀ ከሆነ፣ አዲሱን ማረጋገጫ ምስል ያስገቡ።\n\n"
-            "📤 አዲሱ ምስል ያስገቡ!",
-            reply_markup=get_main_keyboard(user.id)
-        )
         return MAIN_MENU
     if user.id in ADMIN_IDS:
         await update.message.reply_text("❌ አስተዳዳሪዎች ምዝገባ አያስፈልጋቸውም።\n\n🔙 ወደ መነሻ ገጽ!", reply_markup=get_main_keyboard(user.id))
@@ -3353,9 +3173,6 @@ async def send_dinner_reminders(context: ContextTypes.DEFAULT_TYPE):
 # Cancel command
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    # Clear reupload mode on cancel
-    if context.user_data.get('reupload_mode'):
-        context.user_data['reupload_mode'] = False
     context.user_data.clear()
     await update.message.reply_text(
         "❌ ሥራ ተሰርዟል።\n\n"
@@ -3476,8 +3293,6 @@ def main():
         application.add_handler(conv_handler)
         application.add_handler(CallbackQueryHandler(handle_payment_callback, pattern='^(approve|reject)_payment_'))
         application.add_handler(CallbackQueryHandler(handle_location_callback, pattern='^(approve|reject)_location_'))
-        # Global handler for reupload payments (photos when reupload_mode is True)
-        application.add_handler(MessageHandler(filters.PHOTO, handle_reupload_payment))
         application.add_error_handler(error_handler)
         # Schedule daily reminders
         application.job_queue.run_daily(send_lunch_reminders, time=time(9, 0, tzinfo=EAT))
