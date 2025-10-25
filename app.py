@@ -1103,6 +1103,13 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
     user = update.effective_user
     conn = None
     cur = None
+    location_prompt = (
+        "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
+        "📍 **ለምሳሌ:**\n\n"
+        "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
+        "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
+        "🚀 ቦታዎን ያስገቡ!"
+    )
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -1111,8 +1118,8 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
             (user.id,)
         )
         pending = cur.fetchone()
+        choice = update.message.text
         if pending and pending[0] == 'approved':
-            choice = update.message.text
             if choice in ['🍽️ የምሳ', '🥘 የእራት']:
                 return await choose_plan(update, context)
             else:
@@ -1128,6 +1135,53 @@ async def wait_location_approval(update: Update, context: ContextTypes.DEFAULT_T
                     )
                 )
                 return CHOOSE_PLAN
+        elif pending and pending[0] == 'rejected':
+            location = choice.strip()
+            if choice == '🔙 ተመለስ':
+                return await back_to_main(update, context)
+            if not location:
+                await update.message.reply_text(
+                    f"❌ ቦታ አልተስገበም።\n\n{location_prompt}\n\n"
+                    "🔄 እባክዎ እንደገና ይሞክሩ!",
+                    reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
+                )
+                return WAIT_LOCATION_APPROVAL
+            # Process as new location input
+            try:
+                # Insert into pending_locations
+                cur.execute(
+                    "INSERT INTO public.pending_locations (user_id, location_text) VALUES (%s, %s) RETURNING id",
+                    (user.id, location)
+                )
+                pending_id = cur.fetchone()[0]
+                conn.commit()
+                # Notify admins
+                for admin_id in ADMIN_IDS:
+                    try:
+                        keyboard = [
+                            [InlineKeyboardButton("አረጋግጥ", callback_data=f"approve_location_{pending_id}"),
+                             InlineKeyboardButton("ውድቅ አድርግ", callback_data=f"reject_location_{pending_id}")]
+                        ]
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+                        await context.bot.send_message(
+                            chat_id=admin_id,
+                            text=f"🔔 አዲስ ቦታ ጥያቆ (ዳግም ለማረጋገጥ) ከተጠቃሚ {user.id} ({context.user_data.get('full_name', 'የለም')}):\n\n📍 {location}\n\n🔧 ለማረጋገጥ ወይም ለመሰረዝ ይመርጡ!",
+                            reply_markup=reply_markup
+                        )
+                    except Exception as e:
+                        logger.error(f"Error notifying admin {admin_id} about location {pending_id}: {e}")
+                await update.message.reply_text(
+                    "📤 ቦታዎ ተልኳል።\n\n"
+                    "⏳ ከአስተዳዳሪው ማረጋገጫን በትክክል ይጠብቁ።\n\n"
+                    "🚀 በትክክል ይጠብቁ!",
+                    reply_markup=get_main_keyboard(user.id)
+                )
+                context.user_data['pending_location_id'] = pending_id
+                return WAIT_LOCATION_APPROVAL
+            except Exception as e:
+                logger.error(f"Error saving new location after rejection for user {user.id}: {e}")
+                await update.message.reply_text("❌ ቦታ በማስቀመጥ ላይ ስህተትተቀመጥ ላይ ስህተት።\n\n🔄 እባክዎ እንደገና ይሞክሩ!")
+                return WAIT_LOCATION_APPROVAL
         else:
             await update.message.reply_text(
                 "⏳ ቦታዎ ለማረጋገጥ በመጠበቅ ላይ ነው።\n\n"
@@ -2243,6 +2297,13 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
     location_id = int(data[2])
     conn = None
     cur = None
+    location_prompt = (
+        "📝 እባክዎ የመላኪያ ቦታዎን በጽሑፍ ያስገቡ ወይም የGoogle Map Link ይላኩላን\n\n"
+        "📍 **ለምሳሌ:**\n\n"
+        "“Bole Edna mall, Alemnesh Plaza, office number 102”\n\n"
+        "[https://maps.app.goo.gl/o8EYgQAohNpR3gJE7]\n\n"
+        "🚀 ቦታዎን ያስገቡ!"
+    )
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -2288,10 +2349,9 @@ async def handle_location_callback(update: Update, context: ContextTypes.DEFAULT
             await query.edit_message_text("❌ ቦታ ተውደቀ።\n\n🚫 ተውደቀ!")
             await context.bot.send_message(
                 chat_id=user_id,
-                text="❌ ቦታዎ ተሰርዟል።\n\n"
-                     "🔄 እባክዎ ከመጀመር ጋር እንደገና ይጀምሩ።\n\n"
-                     "🚀 /start ይጠቀሙ!",
-                reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
+                text="❌ ቦታዎ ተሰርዟል። እባክዎ አዲሱን ቦታ ያስገቡ:\n\n"
+                     f"{location_prompt}",
+                reply_markup=ReplyKeyboardMarkup([['🔙 ተመለስ']], resize_keyboard=True)
             )
     except Exception as e:
         logger.error(f"Error processing location callback for location {location_id}: {e}")
