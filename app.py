@@ -19,6 +19,9 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import requests
 
+# Global dict for pending reuploads
+pending_reuploads = {}
+
 # Enable logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
@@ -1935,8 +1938,14 @@ async def payment_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        subscription_id = context.user_data.get('subscription_id')
-        total_price = context.user_data.get('total_price', 0)
+        # Determine subscription_id
+        if user.id in pending_reuploads:
+            subscription_id = pending_reuploads[user.id]
+            del pending_reuploads[user.id]  # Clear after use
+            total_price = context.user_data.get('total_price', 0)  # From previous selection
+        else:
+            subscription_id = context.user_data.get('subscription_id')
+            total_price = context.user_data.get('total_price', 0)
         if not subscription_id or total_price <= 0:
             logger.error(f"Missing or invalid subscription_id or total_price for user {user.id}")
             await update.message.reply_text(
@@ -2548,17 +2557,18 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 logger.error(f"Failed to send approval message to user {user_id}: {send_err}")
 
         elif action == 'reject':
-            # Fetch before deletion
+            # Fetch before any changes
             cur.execute(
                 "SELECT meal_date, items FROM public.orders WHERE subscription_id = %s AND status = 'confirmed'",
                 (subscription_id,)
             )
-            orders_before_delete = cur.fetchall()
+            orders_before_change = cur.fetchall()
 
             cur.execute("UPDATE public.payments SET status = 'rejected' WHERE id = %s", (payment_id,))
-            cur.execute("DELETE FROM public.orders WHERE subscription_id = %s", (subscription_id,))
-            cur.execute("DELETE FROM public.subscriptions WHERE id = %s", (subscription_id,))
             conn.commit()
+
+            # Set pending reupload
+            pending_reuploads[user_id] = subscription_id
 
             # Notify admin
             try:
@@ -2574,9 +2584,9 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
             detailed_text = "📢 የክፍያ ማረጋገጫ መልእክት!\n"
             detailed_text += f"❌ ክፍያዎ {amount:.2f} ብር ተውደቀ!\n"
 
-            if orders_before_delete:
+            if orders_before_change:
                 detailed_text += "🍽 የተመረጡ ምግቦችና ቀንት:\n"
-                for meal_date, items_json in orders_before_delete:
+                for meal_date, items_json in orders_before_change:
                     try:
                         items = json.loads(items_json) if isinstance(items_json, str) else items_json
                         if not isinstance(items, list):
@@ -2594,15 +2604,15 @@ async def handle_payment_callback(update: Update, context: ContextTypes.DEFAULT_
                 detailed_text += "   (ምግቦች አልተገኙም)\n"
 
             detailed_text += f"\n💰 ጠቅላላ መጠን: {amount:.2f} ብር\n"
-            detailed_text += "🛒 እባክዎ ከ /subscribe ጋር እንደገና ይጀምሩ።\n"
-            detailed_text += "🔄 እንደገና ይጀምሩ!"
+            detailed_text += "📤 አዲሱ የክፍያ ማረጋገጫ ምስል ያስገቡ ለመቀጠል።\n"
+            detailed_text += "🚀 አዲሱ ምስል ያስገቡ!"
 
             # Send to USER
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
                     text=detailed_text,
-                    reply_markup=ReplyKeyboardMarkup([['📋 ይመዝገቡ', '💬 ድጋፍ']], resize_keyboard=True)
+                    reply_markup=get_main_keyboard(user_id)
                 )
             except Exception as send_err:
                 logger.error(f"Failed to send rejection message to user {user_id}: {send_err}")
@@ -3215,6 +3225,7 @@ def main():
             ],
             states={
                 MAIN_MENU: [
+                    MessageHandler(filters.PHOTO, payment_upload),
                     MessageHandler(filters.Regex('^🍽 ምግብ ዝርዝር$'), show_menu),
                     MessageHandler(filters.Regex('^🛒 ምዝገባ$'), choose_plan),
                     MessageHandler(filters.Regex('^👤 የእኔ መረጃ$'), user_profile),
